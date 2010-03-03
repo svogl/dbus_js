@@ -529,62 +529,11 @@ static void DBusDestructor(JSContext *ctx, JSObject *obj) {
 static JSFunctionSpec _DBusFunctionSpec[] = {
     { "registerObject", DBus_registerObject, 0, 0, 0},
     { "unregisterObject", DBus_unregisterObject, 0, 0, 0},
-    { "connectToSignal", DBus_addSigHandler, 0, 0, 0},
-    { "disconnectFromSignal", DBus_removeSigHandler, 0, 0, 0},
+    { "addSigHandler", DBus_addSigHandler, 0, 0, 0},
+    { "removeSigHandler", DBus_removeSigHandler, 0, 0, 0},
     { "requestBusName", DBus_requestBusName, 0, 0, 0},
     { "emitSignal", DBus_emitSignal, 0, 0, 0},
     { "call", DBus_callMethod, 0, 0, 0},
-    /*
-            { "position",          Actor_set_position,    0, 0, 0 },
-            { "size",              Actor_set_size,    0, 0, 0 },
-            { "addActor",          Actor_container_add,    0, 0, 0 },
-            { "showAll",           Actor_show_all,    0, 0, 0 },
-            { "connect",           Actor_connect,    0, 0, 0 },
-            { "gtk_connect",       Actor_gtk_connect,    0, 0, 0 },
-
-
-    mozjs exports the folllowing...:
-
-      nsIVariant CallMethod(in PRUint16 aBusType,
-                            in AUTF8String aServiceName,
-                            in AUTF8String aObjectPath,
-                            in AUTF8String aInterfaceName,
-                            in AUTF8String aMethodName,
-                            in unsigned long aArgsLength,
-                            [array, size_is(aArgsLength)]
-                            in nsIVariant aArgs,
-                            in IJSCallback aCallback);
-
-      void EmitSignal(in PRUint16 aBusType,
-                      in AUTF8String aObjectPath,
-                      in AUTF8String aInterfaceName,
-                      in AUTF8String aSignalName,
-                      in unsigned long aArgsLength,
-                      [array, size_is(aArgsLength)]
-                      in nsIVariant aArgs);
-
-      unsigned long ConnectToSignal(in PRUint16 aBusType,
-                                    in AUTF8String aServiceName,
-                                    in AUTF8String aObjectPath,
-                                    in AUTF8String aInterfaceName,
-                                    in AUTF8String aSignalName,
-                                    in IJSCallback aCallback);
-
-      void DisconnectFromSignal(in PRUint16 aBusType,
-                                in unsigned long aId);
-
-      boolean RequestService(in PRUint16 aBusType,
-                             in AUTF8String aServiceName);
-  
-      void RegisterObject(in PRUint16 aBusType,
-                          in AUTF8String aObjectPath,
-                          in IJSCallback aCallback);
-
-      void UnregisterObject(in PRUint16 aBusType,
-                            in AUTF8String aObjectPath);
-
-
-     */
     { 0, 0, 0, 0, 0}
 };
 
