@@ -21,16 +21,17 @@ function DeviceKit(bus) {
 	this.disks = {};
 
 	this.devAdd = function(opath) {
-		print("added device " + opath);
+		print("JS::: added device " + opath);
 		disks[opath] = Disk(this.bus, opath);
 	};
 
 	this.devRem = function () {
-		print("removed device " + opath);
+		print("JS::: removed device " + opath);
+		Glib.quit();
 	},
 
 	this.devChg = function(opath) {
-		print("changed device " + opath);
+		print("JS::: changed device " + opath);
 	}
 	this.enumDevices = function() {
 		ret = this.bus.call( this.service, this.oPath, this.iFace, "EnumerateDevices");
@@ -53,10 +54,12 @@ function DeviceKit(bus) {
 
 devKit = new DeviceKit(bus);
 
+print(">>>>>>>> devKit Properties...");
 for (var i in devKit)
 {
 	print(">>> "+ i);
 }
+print(">>>>>>>> devKit Properties.");
 
 
 print("---\n\n");

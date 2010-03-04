@@ -7,14 +7,13 @@
 
 using namespace std;
 
-class DBusMarshalling 
-{
+class DBusMarshalling {
 public:
 
     static JSBool appendArgs(JSContext *cx, JSObject *obj,
-				DBusMessage*     message,
-                               DBusMessageIter* iter,
-				uintN argc, jsval *argv);
+            DBusMessage* message,
+            DBusMessageIter* iter,
+            uintN argc, jsval *argv);
 
     /**getVariantarray parses the arguments found in iter. it needs
      * as its input a  jsval array of length elements, matching the
@@ -31,7 +30,7 @@ public:
 
     static JSBool marshall(DBusMessage **);
 
-    static JSBool marshallVariant(JSContext *ctx, JSObject *obj, DBusMessage *, DBusMessageIter *, jsval * );
+    static JSBool marshallVariant(JSContext *ctx, JSObject *obj, DBusMessage *, DBusMessageIter *, jsval *);
 
 private:
 
@@ -41,8 +40,8 @@ private:
     static JSBool marshallJSProperty(JSContext* ctx, JSObject* aObj, jsval& propval, DBusMessageIter* iter, const JSBool& isVariant);
     static JSBool JSObjectHasVariantValues(JSContext* ctx, JSObject* obj);
 
-    static JSBool unMarshallIter(JSContext *ctx,int type, DBusMessageIter *iter, jsval* val);
-    static JSBool unMarshallBasic(JSContext *ctx,int type, DBusMessageIter *iter, jsval* val);
+    static JSBool unMarshallIter(JSContext *ctx, int type, DBusMessageIter *iter, jsval* val);
+    static JSBool unMarshallBasic(JSContext *ctx, int type, DBusMessageIter *iter, jsval* val);
     static JSBool unMarshallArray(JSContext *ctx, int type, DBusMessageIter *iter, jsval* val);
     static JSBool unMarshallDict(JSContext *ctx, int type, DBusMessageIter *iter, jsval* val);
 
@@ -50,53 +49,15 @@ private:
     static const int getDataTypeSize(PRUint16);
     static const int getDataTypeAsDBusType(PRUint16);
     static const char *getDBusTypeAsSignature(int);
-*/
+     */
 };
 
 
-
-extern JSClass DBusResult_jsClass;
-extern JSClass DBusError_jsClass;
-
-
-
-/***********************/
-/* from the interface idl:
-  nsIVariant CallMethod(in PRUint16 aBusType,
-                        in AUTF8String aServiceName,
-                        in AUTF8String aObjectPath,
-                        in AUTF8String aInterfaceName,
-                        in AUTF8String aMethodName,
-                        in unsigned long aArgsLength,
-                        [array, size_is(aArgsLength)]
-                        in nsIVariant aArgs,
-                        in IJSCallback aCallback);
-
-  void EmitSignal(in PRUint16 aBusType,
-                  in AUTF8String aObjectPath,
-                  in AUTF8String aInterfaceName,
-                  in AUTF8String aSignalName,
-                  in unsigned long aArgsLength,
-                  [array, size_is(aArgsLength)]
-                  in nsIVariant aArgs);
-
-  unsigned long ConnectToSignal(in PRUint16 aBusType,
-                                in AUTF8String aServiceName,
-                                in AUTF8String aObjectPath,
-                                in AUTF8String aInterfaceName,
-                                in AUTF8String aSignalName,
-                                in IJSCallback aCallback);
-
-  void DisconnectFromSignal(in PRUint16 aBusType,
-                            in unsigned long aId);
-
-  boolean RequestService(in PRUint16 aBusType,
-                         in AUTF8String aServiceName);
-*/
-/***********************/
-
-
-
+/** These are used in the marshaler for passing back objects.
+ *
+ */
+extern JSClass DBusResult_jsClass; ///< js dbus result object
+extern JSClass DBusError_jsClass; ///< js dbus error object
 
 /************** helpers */
 #define check_args(assert, ...) if (!(assert)) { \
@@ -112,12 +73,18 @@ extern JSClass DBusError_jsClass;
                error.name, error.message); \
         dbus_error_free(&error); \
         return JS_FALSE; \
-    }
+    } // TODO: raise dbus exception / error object instead!
 
-#define MOZJSDBUS_CALL_OOMCHECK(_exp)      \
-        if (!(_exp)) {                     \
-            return JS_FALSE; \
-        }                                  \
+#define enforce_notnull(_exp)      \
+         check_args( (_exp), "are we oom?")
 
 
+#define DEBUG_LEVEL 2
+#define dbg(x) if (DEBUG_LEVEL>=1) { x ; }
+#define dbg2(x) if (DEBUG_LEVEL>=2) { x ; }
+#define dbg3(x) if (DEBUG_LEVEL>=3) { x ; }
+
+#define  dbg_err(x) if (DEBUG_LEVEL>=1) { cerr << __FUNCTION__ << ":" << __LINE__ << " " << x << endl; }
+#define dbg2_err(x) if (DEBUG_LEVEL>=2) { cerr << __FUNCTION__ << ":" << __LINE__ << " " << x << endl; }
+#define dbg3_err(x) if (DEBUG_LEVEL>=3) { cerr << __FUNCTION__ << ":" << __LINE__ << " " << x << endl; }
 
