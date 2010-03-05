@@ -678,24 +678,9 @@ static JSBool DBus_s_sessionBus(JSContext *ctx, JSObject *obj, uintN argc, jsval
     return JS_TRUE;
 }
 
-static JSBool DBus_s_mainloop(JSContext *ctx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
-    printf("object is in sessionBus: %p\n", obj);
-
-    check_args((argc == 0), "must not pass an argument!\n");
-
-    JSObject *bus = JS_ConstructObject(ctx, &DBus_jsClass, NULL, NULL);
-    dbusData* dta = (dbusData *) JS_GetPrivate(ctx, bus);
-
-    dta->name = strdup("system");
-
-    *rval = OBJECT_TO_JSVAL(bus);
-    return JS_TRUE;
-}
-
 static JSFunctionSpec _DBusStaticFunctionSpec[] = {
     { "sessionBus", DBus_s_sessionBus, 0, 0, 0},
     { "systemBus", DBus_s_systemBus, 0, 0, 0},
-    { "mainloop", DBus_s_mainloop, 0, 0, 0},
     { 0, 0, 0, 0, 0}
 };
 
