@@ -79,12 +79,27 @@ extern JSClass DBusError_jsClass; ///< js dbus error object
          check_args( (_exp), "are we oom?")
 
 
-#define DEBUG_LEVEL 2
-#define dbg(x) if (DEBUG_LEVEL>=1) { x ; }
-#define dbg2(x) if (DEBUG_LEVEL>=2) { x ; }
-#define dbg3(x) if (DEBUG_LEVEL>=3) { x ; }
+extern int indent;
+#define DEBUG_LEVEL 1
+#define ind() { int _i=indent; while(_i--) { cerr << "  ";} }
 
-#define  dbg_err(x) if (DEBUG_LEVEL>=1) { cerr << __FUNCTION__ << ":" << __LINE__ << " " << x << endl; }
-#define dbg2_err(x) if (DEBUG_LEVEL>=2) { cerr << __FUNCTION__ << ":" << __LINE__ << " " << x << endl; }
-#define dbg3_err(x) if (DEBUG_LEVEL>=3) { cerr << __FUNCTION__ << ":" << __LINE__ << " " << x << endl; }
+#define dbg(x) if (DEBUG_LEVEL>=1) { ind(); x ; }
+#define dbg2(x) if (DEBUG_LEVEL>=2) {ind();  x ; }
+#define dbg3(x) if (DEBUG_LEVEL>=3) {ind();  x ; }
 
+#define  dbg_err(x) if (DEBUG_LEVEL>=1) {ind();  cerr << __FUNCTION__ << ":" << __LINE__ << " " << x << endl; }
+#define dbg2_err(x) if (DEBUG_LEVEL>=2) {ind();  cerr << __FUNCTION__ << ":" << __LINE__ << " " << x << endl; }
+#define dbg3_err(x) if (DEBUG_LEVEL>=3) {ind();  cerr << __FUNCTION__ << ":" << __LINE__ << " " << x << endl; }
+
+/** walk over all elements to count the number of elements.
+ * Side-effects: you have to re-init the iterator after calling this function!
+ */
+static inline int dbus_iter_length(DBusMessageIter* iter) {
+    int current_type;
+    int length=0;
+    while ((current_type = dbus_message_iter_get_arg_type (iter)) != DBUS_TYPE_INVALID) {
+        length++;
+        dbus_message_iter_next (iter);
+    }
+    return length;
+}

@@ -37,7 +37,6 @@ typedef struct _Glib {
 /*************************************************************************************************/
 /** Glib Constructor */
 static JSBool GlibConstructor(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
-    int i;
     if (argc == 0) {
         glibData* dta = NULL;
 

@@ -86,7 +86,7 @@ static JSBool DBus_addSigHandler(JSContext *ctx, JSObject *obj, uintN argc, jsva
     matchRule += "',path='";
     matchRule += JS_GetStringBytes(oPath);
     matchRule += "'";
-    dbg(cerr << "ADD MATCH: " << matchRule << "\n");
+    dbg2(cerr << "ADD MATCH: " << matchRule << "\n");
 
     key = JS_GetStringBytes(oPath);
     key += "/";
@@ -254,11 +254,9 @@ static JSBool DBus_callMethod(JSContext *ctx, JSObject *obj, uintN argc, jsval *
 
     int length = 0;
     dbus_message_iter_init(reply, &iter);
-    while (dbus_message_iter_next(&iter)) {
-        length++;
-    }
-
+    length =  dbus_iter_length(&iter);
     dbus_message_iter_init(reply, &iter);
+
     jsval* vector = new jsval[length];
 
     JSBool success = DBusMarshalling::getVariantArray(ctx, &iter, &length, vector);
@@ -292,15 +290,17 @@ filter_func(DBusConnection* connection, DBusMessage* message, void* user_data) {
     string key;
     DBusMessageIter iter;
 
-    cout << "----- filter handlers:" << endl;
     map<string, callbackInfo*>& m = dta->handlers;
     map<string, callbackInfo*>::iterator it;
+#if DEBUG_LEVEL>3
+    cout << "----- filter handlers:" << endl;
     it = m.begin();
     while (it != m.end()) {
         cout << it->first << " ---> " << it->second->match << endl;
         it++;
     }
     cout << "----- filter handlers." << endl;
+#endif
 
     if (dbus_message_get_type(message) == DBUS_MESSAGE_TYPE_SIGNAL) {
         interface = dbus_message_get_interface(message);
@@ -472,15 +472,13 @@ message_handler(DBusConnection* connection,
     length = 0;
 
     dbus_message_iter_init(message, &iter);
-    while (dbus_message_iter_next(&iter)) {
-        length++;
-    }
+    length = dbus_iter_length(&iter);
+    dbus_message_iter_init(message, &iter);
+
     cerr << "length = " << length << endl;
     {
         jsval rval;
         vector = new jsval[length];
-
-        dbus_message_iter_init(message, &iter);
 
         DBusMarshalling::getVariantArray(dta->ctx, &iter, &length, vector);
         cerr << "length after = " << length << endl;

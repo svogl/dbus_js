@@ -4,6 +4,9 @@
 
 using namespace std;
 
+
+int indent = 0;
+
 JSBool
 DBusMarshalling::appendArgs(JSContext *cx, JSObject *obj,
         DBusMessage *message,
@@ -372,37 +375,46 @@ JSBool DBusMarshalling::getVariantArray(JSContext *ctx, DBusMessageIter *iter, i
         dbus_message_iter_next(iter);
         len++;
     }
+    dbg2_err("gVA << end len " << len);
     *length = len;
     return ret;
 }
 
 JSBool DBusMarshalling::unMarshallIter(JSContext *ctx, int current_type, DBusMessageIter *iter, jsval* val) {
+    JSBool ret = JS_TRUE;
     if (dbus_type_is_basic(current_type)) {
         dbg3(cerr << "basic type.. ");
-        return unMarshallBasic(ctx, current_type, iter, val);
+        ret = unMarshallBasic(ctx, current_type, iter, val);
     } else if (dbus_type_is_container(current_type)) {
         cerr << "container type.. ";
         switch (current_type) {
             case DBUS_TYPE_ARRAY:
             {
                 dbg3(cerr << "array");
-                return unMarshallArray(ctx, current_type, iter, val);
+                indent ++;
+                ret = unMarshallArray(ctx, current_type, iter, val);
+                indent --;
+                break;
             }
             case DBUS_TYPE_DICT_ENTRY:
             {
                 dbg3(cerr << "dict.. "); //@TODO implement dict type
-                return unMarshallDict(ctx, current_type, iter, val);
+                indent++;
+                ret = unMarshallDict(ctx, current_type, iter, val);
+                indent--;
+                break;
             }
             default:
             {
                 cerr << "unknown container type " << (char) current_type << "\n";
-                return JS_FALSE;
+                ret = JS_FALSE;
             }
         }
     } else {
         cerr << "what's this??? " << dbus_message_iter_get_signature(iter) << endl;
+        ret = JS_FALSE;
     }
-    return JS_TRUE;
+    return ret;
 }
 
 JSBool DBusMarshalling::unMarshallBasic(JSContext *ctx, int type, DBusMessageIter *iter, jsval* value) {
@@ -426,6 +438,7 @@ JSBool DBusMarshalling::unMarshallBasic(JSContext *ctx, int type, DBusMessageIte
             jsint val;
             dbus_message_iter_get_basic(iter, &val);
             *value = INT_TO_JSVAL(val);
+            dbg2(cerr << "int16 [" << *value << "]");
             //variant->SetAsInt16(val);
             break;
         }
@@ -434,6 +447,7 @@ JSBool DBusMarshalling::unMarshallBasic(JSContext *ctx, int type, DBusMessageIte
             jsint val;
             dbus_message_iter_get_basic(iter, &val);
             *value = INT_TO_JSVAL(val);
+            dbg2(cerr << "int16 [" << *value << "]");
             //variant->SetAsUint16(val);
             break;
         }
@@ -442,6 +456,7 @@ JSBool DBusMarshalling::unMarshallBasic(JSContext *ctx, int type, DBusMessageIte
             jsint val;
             dbus_message_iter_get_basic(iter, &val);
             *value = INT_TO_JSVAL(val);
+            dbg2(cerr << "int32 [" << *value << "]");
             //variant->SetAsInt32(val);
             break;
         }
@@ -450,6 +465,7 @@ JSBool DBusMarshalling::unMarshallBasic(JSContext *ctx, int type, DBusMessageIte
             jsint val;
             dbus_message_iter_get_basic(iter, &val);
             *value = INT_TO_JSVAL(val);
+            dbg2(cerr << "uint32 [" << *value << "]");
             //variant->SetAsUint32(val);
             break;
         }
@@ -505,31 +521,30 @@ DBusMarshalling::unMarshallArray(JSContext *ctx, int type, DBusMessageIter *iter
     DBusMessageIter subiter;
     int length = 0;
     jsval* vector;
-
-    dbg3(cerr << ">> array " << endl);
+    int current_type;
 
     dbus_message_iter_recurse(iter, &subiter);
-    while (dbus_message_iter_next(&subiter)) {
-        length++;
+    length = dbus_iter_length(&subiter);
+    dbus_message_iter_recurse(iter, &subiter);
+
+    dbg3_cerr( << "unMarsh len1 = " << length <<
+            " sig = " << dbus_message_iter_get_signature(&subiter) );
+
+    if (length==0) {
+        //empty array
     }
+
     vector = new jsval[length]; //TODO: memleak?
-    dbus_message_iter_recurse(iter, &subiter);
-    dbg3(cerr << "unMarsh len = " << length << " sig = ");
-    dbg3(cerr << dbus_message_iter_get_signature(&subiter) << endl);
 
     ret = getVariantArray(ctx, &subiter, &length, vector);
-    dbg3(cerr << "unMarsch len = " << length << endl);
+    dbg3_cerr( << "unMarsch len2 = " << length << endl);
     if (ret == JS_FALSE)
         return ret;
-    dbg3(cerr << "unMarsch len = " << length << endl);
-
-    if (length > 0) {
-        //rv = variant->SetAsArray(nsIDataType::VTYPE_INTERFACE_IS,
-        //        &NS_GET_IID(nsIVariant), length, array);
-
+//create array in any case...
+//    if (length > 0) {
         JSObject * args = JS_NewArrayObject(ctx, length, vector);
         *val = OBJECT_TO_JSVAL(args);
-    }
+//    }
     return JS_TRUE;
 }
 
