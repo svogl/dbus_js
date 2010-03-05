@@ -438,7 +438,7 @@ JSBool DBusMarshalling::unMarshallBasic(JSContext *ctx, int type, DBusMessageIte
             jsint val;
             dbus_message_iter_get_basic(iter, &val);
             *value = INT_TO_JSVAL(val);
-            dbg2(cerr << "int16 [" << *value << "]");
+            dbg2_err( "int16 [" << (*value) << "]");
             //variant->SetAsInt16(val);
             break;
         }
@@ -447,7 +447,7 @@ JSBool DBusMarshalling::unMarshallBasic(JSContext *ctx, int type, DBusMessageIte
             jsint val;
             dbus_message_iter_get_basic(iter, &val);
             *value = INT_TO_JSVAL(val);
-            dbg2(cerr << "int16 [" << *value << "]");
+            dbg2_err( "int16 [" << *value << "]");
             //variant->SetAsUint16(val);
             break;
         }
@@ -456,7 +456,7 @@ JSBool DBusMarshalling::unMarshallBasic(JSContext *ctx, int type, DBusMessageIte
             jsint val;
             dbus_message_iter_get_basic(iter, &val);
             *value = INT_TO_JSVAL(val);
-            dbg2(cerr << "int32 [" << *value << "]");
+            dbg2_err( "int32 [" << *value << "]");
             //variant->SetAsInt32(val);
             break;
         }
@@ -465,7 +465,7 @@ JSBool DBusMarshalling::unMarshallBasic(JSContext *ctx, int type, DBusMessageIte
             jsint val;
             dbus_message_iter_get_basic(iter, &val);
             *value = INT_TO_JSVAL(val);
-            dbg2(cerr << "uint32 [" << *value << "]");
+            dbg2_err( "uint32 [" << *value << "]");
             //variant->SetAsUint32(val);
             break;
         }
@@ -475,7 +475,7 @@ JSBool DBusMarshalling::unMarshallBasic(JSContext *ctx, int type, DBusMessageIte
             dbus_message_iter_get_basic(iter, &val);
             *value = INT_TO_JSVAL(val);
             //variant->SetAsInt64(val);
-            cerr << "POTENTIAL OVERFLOW \n";
+            cerr << "INT64 POTENTIAL OVERFLOW \n";
             break;
         }
         case DBUS_TYPE_UINT64:
@@ -484,7 +484,7 @@ JSBool DBusMarshalling::unMarshallBasic(JSContext *ctx, int type, DBusMessageIte
             dbus_message_iter_get_basic(iter, &val);
             *value = INT_TO_JSVAL(val);
             //variant->SetAsUint64(val);
-            cerr << "POTENTIAL OVERFLOW \n";
+            cerr << "UINT64 POTENTIAL OVERFLOW \n";
             break;
         }
         case DBUS_TYPE_DOUBLE:
@@ -501,7 +501,7 @@ JSBool DBusMarshalling::unMarshallBasic(JSContext *ctx, int type, DBusMessageIte
         {
             char *val;
             dbus_message_iter_get_basic(iter, &val);
-            dbg2(cerr << "string [" << val << "]");
+            dbg2_err( "string [" << val << "]");
             JSString *str = JS_NewStringCopyZ(ctx, val);
             *value = STRING_TO_JSVAL(str);
             break;
@@ -511,7 +511,6 @@ JSBool DBusMarshalling::unMarshallBasic(JSContext *ctx, int type, DBusMessageIte
             return JS_FALSE;
         }
     }
-    cerr << endl;
     return JS_TRUE;
 }
 
@@ -527,7 +526,7 @@ DBusMarshalling::unMarshallArray(JSContext *ctx, int type, DBusMessageIter *iter
     length = dbus_iter_length(&subiter);
     dbus_message_iter_recurse(iter, &subiter);
 
-    dbg3_cerr( << "unMarsh len1 = " << length <<
+    dbg3_err(  "unMarsh len1 = " << length <<
             " sig = " << dbus_message_iter_get_signature(&subiter) );
 
     if (length==0) {
@@ -537,7 +536,7 @@ DBusMarshalling::unMarshallArray(JSContext *ctx, int type, DBusMessageIter *iter
     vector = new jsval[length]; //TODO: memleak?
 
     ret = getVariantArray(ctx, &subiter, &length, vector);
-    dbg3_cerr( << "unMarsch len2 = " << length << endl);
+    dbg3_err( "unMarsch len2 = " << length << endl);
     if (ret == JS_FALSE)
         return ret;
 //create array in any case...
