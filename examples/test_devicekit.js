@@ -25,7 +25,7 @@ function DeviceKit(bus) {
 		disks[opath] = Disk(this.bus, opath);
 	};
 
-	this.devRem = function () {
+	this.devRem = function (opath) {
 		print("JS::: removed device " + opath);
 		Glib.quit();
 	},
@@ -62,6 +62,8 @@ for (var i in devKit)
 print(">>>>>>>> devKit Properties.");
 
 
+if (false) {
+
 print("---\n\n");
 for(var i=0; i < devKit.length; i++ ){
 	print("-> " + devKit[i] );
@@ -73,6 +75,9 @@ ret = devKit.enumDevices();
 for(var i=0; i < ret.length; i++ ){
 	print("-> " + ret[i] );
 }
+
+
+} 
 
 Glib.mainloop();
 
