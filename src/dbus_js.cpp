@@ -18,8 +18,6 @@
 #include <dbus/dbus-glib.h>
 #include <dbus/dbus-glib-lowlevel.h>
 
-#include <glib.h>
-
 #include "marshal.h"
 using namespace std;
 
@@ -57,42 +55,92 @@ typedef struct _dbus {
 } dbusData;
 
 static JSBool DBus_addSigHandler(JSContext *ctx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
-    string matchRule;
-    string key;
+    string matchRule = "";
+    string key = "";
     DBusError dbus_error;
-
-    check_args(argc == 5, "pass service + one callback function!");
-    check_args(JSVAL_IS_STRING(argv[0]), "arg[0] must be a string (service;ignored)!");
-    check_args(JSVAL_IS_STRING(argv[1]), "arg[1] must be a string (obj path)!");
-    check_args(JSVAL_IS_STRING(argv[2]), "arg[2] must be a string (interface)!");
-    check_args(JSVAL_IS_STRING(argv[3]), "arg[3] must be a string (signal)!");
-    check_args(JSVAL_IS_OBJECT(argv[4]), "arg[4] must be a callback function!");
 
     dbusData* dta = (dbusData *) JS_GetPrivate(ctx, obj);
 
-    //JSString* servN = JSVAL_TO_STRING(argv[0]);
-    JSString* oPath = JSVAL_TO_STRING(argv[1]);
-    JSString* iFace = JSVAL_TO_STRING(argv[2]);
-    JSString* sigName = JSVAL_TO_STRING(argv[3]);
-    JSObject* fo = JSVAL_TO_OBJECT(argv[4]);
-    check_args(JS_ObjectIsFunction(ctx, fo), "arg[4] must be a callback function!");
+    // update:: use one dict object for matching
+    if (argc == 1 && jsvalIsDictObject(argv[0])) {
+        // dict entries contain match rule:
+        JSObject* opts = JSVAL_TO_OBJECT(argv[0]);
+        jsval arg;
+
+        if (JS_GetProperty(ctx, opts, "sigtype", &arg)
+                && JSVAL_IS_STRING(arg)) {
+            check_args(JSVAL_IS_STRING(arg), "argument must be a string! %d", arg);
+            JSString* argval = JSVAL_TO_STRING(arg);
+            matchRule += "type='";
+            matchRule += JS_GetStringBytes(argval);
+            matchRule += "',";
+            key += JS_GetStringBytes(argval);
+            key += "/";
+        };
+        if (JS_GetProperty(ctx, opts, "interface", &arg) && JSVAL_IS_STRING(arg)) {
+            check_args(JSVAL_IS_STRING(arg), "argument must be a string!");
+            JSString* argval = JSVAL_TO_STRING(arg);
+            matchRule += "interface='";
+            matchRule += JS_GetStringBytes(argval);
+            matchRule += "',";
+            key += JS_GetStringBytes(argval);
+            key += "/";
+        };
+        if (JS_GetProperty(ctx, opts, "path", &arg) && JSVAL_IS_STRING(arg)) {
+            check_args(JSVAL_IS_STRING(arg), "argument must be a string!");
+            JSString* argval = JSVAL_TO_STRING(arg);
+            matchRule += "path='";
+            matchRule += JS_GetStringBytes(argval);
+            matchRule += "',";
+            key += JS_GetStringBytes(argval);
+            key += "/";
+        };
+        if (JS_GetProperty(ctx, opts, "member", &arg) && JSVAL_IS_STRING(arg)) {
+            check_args(JSVAL_IS_STRING(arg), "argument must be a string!");
+            JSString* argval = JSVAL_TO_STRING(arg);
+            matchRule += "member='";
+            matchRule += JS_GetStringBytes(argval);
+            matchRule += "',";
+            key += JS_GetStringBytes(argval);
+            key += "/";
+        };
+        dbg2_err("match = " << matchRule);
+        dbg2_err("key = " << key);
+
+    } else {
+        check_args(argc == 5, "pass service + one callback function!");
+        check_args(JSVAL_IS_STRING(argv[0]), "arg[0] must be a string (service;ignored)!");
+        check_args(JSVAL_IS_STRING(argv[1]), "arg[1] must be a string (obj path)!");
+        check_args(JSVAL_IS_STRING(argv[2]), "arg[2] must be a string (interface)!");
+        check_args(JSVAL_IS_STRING(argv[3]), "arg[3] must be a string (signal)!");
+        check_args(JSVAL_IS_OBJECT(argv[4]), "arg[4] must be a callback function!");
+
+        //JSString* servN = JSVAL_TO_STRING(argv[0]);
+        JSString* oPath = JSVAL_TO_STRING(argv[1]);
+        JSString* iFace = JSVAL_TO_STRING(argv[2]);
+        JSString* sigName = JSVAL_TO_STRING(argv[3]);
+
+        JSObject* fo = JSVAL_TO_OBJECT(argv[4]);
+        check_args(JS_ObjectIsFunction(ctx, fo), "arg[4] must be a callback function!");
+
+        matchRule = "type='signal',interface='";
+        matchRule += JS_GetStringBytes(iFace);
+        matchRule += "',member='";
+        matchRule += JS_GetStringBytes(sigName);
+        matchRule += "',path='";
+        matchRule += JS_GetStringBytes(oPath);
+        matchRule += "'";
+
+        dbg2(cerr << "ADD MATCH: " << matchRule << "\n");
+
+        key = JS_GetStringBytes(oPath);
+        key += "/";
+        key += JS_GetStringBytes(iFace);
+        key += "/";
+        key += JS_GetStringBytes(sigName);
+    }
 
     dbus_error_init(&dbus_error);
-
-    matchRule = "type='signal',interface='";
-    matchRule += JS_GetStringBytes(iFace);
-    matchRule += "',member='";
-    matchRule += JS_GetStringBytes(sigName);
-    matchRule += "',path='";
-    matchRule += JS_GetStringBytes(oPath);
-    matchRule += "'";
-    dbg2(cerr << "ADD MATCH: " << matchRule << "\n");
-
-    key = JS_GetStringBytes(oPath);
-    key += "/";
-    key += JS_GetStringBytes(iFace);
-    key += "/";
-    key += JS_GetStringBytes(sigName);
 
     dbus_bus_add_match(dta->connection, matchRule.c_str(), &dbus_error);
     check_dbus_error(dbus_error);
@@ -254,7 +302,7 @@ static JSBool DBus_callMethod(JSContext *ctx, JSObject *obj, uintN argc, jsval *
 
     int length = 0;
     dbus_message_iter_init(reply, &iter);
-    length =  dbus_iter_length(&iter);
+    length = dbus_iter_length(&iter);
     dbus_message_iter_init(reply, &iter);
 
     jsval* vector = new jsval[length];
@@ -264,21 +312,128 @@ static JSBool DBus_callMethod(JSContext *ctx, JSObject *obj, uintN argc, jsval *
     dbg2(cerr << "reply array length: " << length << endl);
 
     if (success) {
-        if (length == 1) {
+        if (length == 0) {
+            // nil.
+        } else if (length == 1) {
             *rval = vector[0];
 
         } else {
-
-            cerr << "TODO: create array object!" << endl;
+            cerr << "TODO: create array object of return values!" << endl;
         }
     }
     delete vector;
 
     return JS_TRUE;
 }
-/*************************************************************************************************/
 
+static JSBool DBus_callMethodAA(JSContext *ctx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
+    dbusData* dta = (dbusData *) JS_GetPrivate(ctx, obj);
+    DBusConnection *connection = dta->connection;
+    DBusMessage *message;
+    DBusMessageIter iter;
+    DBusMessage *reply;
+    DBusError dbus_error;
+
+    check_args(argc == 5, "argc must be 5!");
+    check_args(JSVAL_IS_STRING(argv[0]), "arg[0] must be a string (service name)!");
+    check_args(JSVAL_IS_STRING(argv[1]), "arg[1] must be a string (obj path)!");
+    check_args(JSVAL_IS_STRING(argv[2]), "arg[2] must be a string (interface)!");
+    check_args(JSVAL_IS_STRING(argv[3]), "arg[3] must be a string (member to call)!");
+    check_args(JSVAL_IS_OBJECT(argv[4]), "arg[4] must be an (array) object!");
+
+    JSString* sName = JSVAL_TO_STRING(argv[0]);
+    JSString* oPath = JSVAL_TO_STRING(argv[1]);
+    JSString* iFace = JSVAL_TO_STRING(argv[2]);
+    JSString* method = JSVAL_TO_STRING(argv[3]);
+
+    dbus_error_init(&dbus_error);
+
+    dbg2(cerr << "sName " << JS_GetStringBytes(sName) << endl);
+    dbg2(cerr << "opath " << JS_GetStringBytes(oPath) << endl);
+    dbg2(cerr << "iface " << JS_GetStringBytes(iFace) << endl);
+    dbg2(cerr << "member " << JS_GetStringBytes(method) << endl);
+
+    message = dbus_message_new_method_call(
+            JS_GetStringBytes(sName),
+            JS_GetStringBytes(oPath),
+            JS_GetStringBytes(iFace),
+            JS_GetStringBytes(method));
+
+    if (message == NULL) {
+        return JS_FALSE;
+    }
+
+    JSObject* argArray = JSVAL_TO_OBJECT(argv[4]);
+    check_args(JS_IsArrayObject(ctx, argArray), "must pass an array object!");
+
+    if (argc > 4) {
+        dbus_message_iter_init_append(message, &iter);
+
+        DBusMarshalling::marshallVariant(ctx, obj, &iter, &argv[4]);
+    } else {
+    }
+    // only blocking calls!
+    reply = dbus_connection_send_with_reply_and_block(connection, message, -1, &dbus_error);
+    dbus_message_unref(message);
+
+    check_dbus_error(dbus_error);
+
+    const char* sig = dbus_message_get_signature(reply);
+    dbg2(cerr << "reply sig::: " << sig << endl);
+
+    int length = 0;
+    dbus_message_iter_init(reply, &iter);
+    length = dbus_iter_length(&iter);
+    dbus_message_iter_init(reply, &iter);
+
+    jsval* vector = new jsval[length];
+
+    JSBool success = DBusMarshalling::getVariantArray(ctx, &iter, &length, vector);
+
+    dbg2(cerr << "reply array length: " << length << endl);
+
+    if (success) {
+        if (length == 0) {
+            // nil.
+        } else if (length == 1) {
+            *rval = vector[0];
+
+        } else {
+            cerr << "TODO: create array object of return values!" << endl;
+        }
+    }
+    delete vector;
+
+    return JS_TRUE;
+}
+
+/*************************************************************************************************/
+#ifdef DEBUG_DBUS_LOWLEVEL
 /** DBus message handling - callbacks, utility functions */
+static void printer(DBusMessageIter* iter) {
+    while (dbus_message_iter_has_next(iter)) {
+        char* sig = dbus_message_iter_get_signature(iter);
+        char* val;
+        dbg2_err("  sig " << sig);
+        if ('s' == *sig) {
+            dbus_message_iter_get_basic(iter, &val);
+            dbg2_err("  bas " << val);
+        } else if ('a' == *sig      // array
+                || 'r' == *sig      // struct
+                || 'e' == *sig      // struct
+                || '{' == *sig) {   // dict
+            dbg2_err("  container " << sig);
+            DBusMessageIter sub;
+            dbus_message_iter_recurse(iter, &sub);
+            printer(&sub);
+            dbg2_err("  container done: " << sig);
+        } else {
+            dbg2_err("  unknown sig  " << sig);
+        }
+        dbus_message_iter_next(iter);
+    }
+}
+#endif
 
 DBusHandlerResult
 filter_func(DBusConnection* connection, DBusMessage* message, void* user_data) {
@@ -289,6 +444,10 @@ filter_func(DBusConnection* connection, DBusMessage* message, void* user_data) {
     const char *path;
     string key;
     DBusMessageIter iter;
+
+    interface = dbus_message_get_interface(message);
+    name = dbus_message_get_member(message);
+    path = dbus_message_get_path(message);
 
     map<string, callbackInfo*>& m = dta->handlers;
     map<string, callbackInfo*>::iterator it;
@@ -303,9 +462,6 @@ filter_func(DBusConnection* connection, DBusMessage* message, void* user_data) {
 #endif
 
     if (dbus_message_get_type(message) == DBUS_MESSAGE_TYPE_SIGNAL) {
-        interface = dbus_message_get_interface(message);
-        name = dbus_message_get_member(message);
-        path = dbus_message_get_path(message);
 
         key = path;
         key += "/";
@@ -314,12 +470,16 @@ filter_func(DBusConnection* connection, DBusMessage* message, void* user_data) {
         key += name;
         cerr << "filter_func key::" << key << endl;
 
+#ifdef DEBUG_DBUS_LOWLEVEL
+        dbg2_err("signature " << dbus_message_get_signature(message));
+        dbus_message_iter_init(message, &iter);
+        printer(&iter);
+#endif
         if ((it = m.find(key)) != m.end()) {
-
-            cout << "----- found in map!!!\n";
+            dbg2_err("----- found in map!!!");
         } else {
 
-            cout << "----- not found in map.\n";
+            dbg2_err("----- not found in map.");
             return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
         }
 
@@ -327,32 +487,6 @@ filter_func(DBusConnection* connection, DBusMessage* message, void* user_data) {
         JSFunction *callback = NULL;
         jsval valp;
 
-#if 0
-        JSBool ret = JS_GetProperty(dta->ctx, busObj, key.c_str(), &valp);
-        if (!ret) {
-            cerr << "ret false for prop " << key << endl;
-        } else {
-            if (JSVAL_IS_NULL(valp)) {
-                cerr << "null. no match\n";
-                goto fail;
-            }
-            if (JSVAL_IS_VOID(valp)) {
-                cerr << "void. no match\n";
-                goto fail;
-            }
-            if (!JSVAL_IS_OBJECT(valp)) {
-                cerr << " key->value should be a callback. " << valp << endl;
-                goto fail;
-            }
-            JSObject* fo = JSVAL_TO_OBJECT(valp);
-            if (!JS_ObjectIsFunction(dta->ctx, fo)) {
-                cerr << " key->value should be a callback.\n";
-                goto fail;
-            }
-
-            callback = JS_ValueToFunction(dta->ctx, valp);
-        }
-#else
         valp = it->second->callback;
 
         if (JSVAL_IS_VOID(valp)) {
@@ -373,7 +507,6 @@ filter_func(DBusConnection* connection, DBusMessage* message, void* user_data) {
 
         callback = JS_ValueToFunction(dta->ctx, valp);
 
-#endif
         /*
                 if (callback == NULL)
                     return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
@@ -411,7 +544,29 @@ filter_func(DBusConnection* connection, DBusMessage* message, void* user_data) {
         delete vector;
         return DBUS_HANDLER_RESULT_HANDLED;
     } else {
-        cerr << "dbus ignore msg type " << dbus_message_get_type(message) << endl;
+#ifdef DEBUG_DBUS_LOWLEVEL
+        switch (dbus_message_get_type(message)) {
+            case DBUS_MESSAGE_TYPE_METHOD_CALL:
+                dbg2_err("dbus ignore method call " << path << " " << interface << " " << name);
+                break;
+            case DBUS_MESSAGE_TYPE_METHOD_RETURN:
+                dbg2_err("dbus ignore method return" << path << " " << interface << " " << name);
+                break;
+            case DBUS_MESSAGE_TYPE_ERROR:
+                dbg2_err("dbus ignore method error" << path << " " << interface << " " << name);
+                goto fail;
+            default:
+                cerr << "dbus ignore msg type " << dbus_message_get_type(message) << endl;
+                goto fail;
+        }
+        dbg2_err("signature " << dbus_message_get_signature(message));
+        dbus_message_iter_init(message, &iter);
+        while (dbus_message_iter_has_next(&iter)) {
+            printer(&iter);
+            dbus_message_iter_next(&iter);
+        }
+        dbg2_err("signature done ");
+#endif
     }
 fail:
     return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
@@ -560,6 +715,14 @@ static void DBusDestructor(JSContext *ctx, JSObject *obj) {
     }
 }
 
+static JSBool DBusObjConstructor(JSContext *ctx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
+    return JS_TRUE;
+}
+
+static void DBusObjDestructor(JSContext *ctx, JSObject *obj) {
+    printf("Destroying DBus object\n");
+}
+
 /*************************************************************************************************/
 
 ///// DBus Function Table
@@ -571,6 +734,7 @@ static JSFunctionSpec _DBusFunctionSpec[] = {
     { "requestBusName", DBus_requestBusName, 0, 0, 0},
     { "emitSignal", DBus_emitSignal, 0, 0, 0},
     { "call", DBus_callMethod, 0, 0, 0},
+    { "callArrayArg", DBus_callMethodAA, 0, 0, 0},
     { 0, 0, 0, 0, 0}
 };
 
@@ -583,6 +747,16 @@ static JSClass DBus_jsClass = {
     JS_PropertyStub, JS_PropertyStub, // get/set prop
     JS_EnumerateStub, JS_ResolveStub, // enum / resolve
     JS_ConvertStub, DBusDestructor, // convert / finalize
+    0, 0, 0, 0,
+    0, 0, 0, 0
+};
+
+JSClass DBusDict_jsClass = {
+    "DBusDict", 0,
+    JS_PropertyStub, JS_PropertyStub, // add/del prop
+    JS_PropertyStub, JS_PropertyStub, // get/set prop
+    JS_EnumerateStub, JS_ResolveStub, // enum / resolve
+    JS_ConvertStub, 0, // convert / finalize
     0, 0, 0, 0,
     0, 0, 0, 0
 };
@@ -700,14 +874,20 @@ JSObject* DBusInit(JSContext *ctx, JSObject *obj) {
 
     // result object
     JS_InitClass(ctx, obj, NULL,
+            &DBusDict_jsClass,
+            DBusObjConstructor, 0, NULL, // properties
+            0, NULL, 0);
+    // result object
+    JS_InitClass(ctx, obj, NULL,
             &DBusResult_jsClass,
-            0, 0, NULL, // properties
+            DBusObjConstructor,
+            0, NULL, // properties
             0, NULL, 0);
 
     // error obj
     JS_InitClass(ctx, obj, NULL,
-            &DBusResult_jsClass,
-            0, 0, NULL, // properties
+            &DBusError_jsClass,
+            DBusObjConstructor, 0, NULL, // properties
             0, NULL, 0);
 }
 

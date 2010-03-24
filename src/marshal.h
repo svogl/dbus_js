@@ -30,13 +30,17 @@ public:
 
     static JSBool marshall(DBusMessage **);
 
-    static JSBool marshallVariant(JSContext *ctx, JSObject *obj, DBusMessage *, DBusMessageIter *, jsval *);
+    static JSBool marshallVariant(JSContext *ctx, JSObject *obj, /*DBusMessage *,*/ DBusMessageIter *, jsval *);
 
 private:
+
+    static JSBool marshallBasicValue(JSContext *ctx, JSObject *obj, /*DBusMessage *,*/ DBusMessageIter *, jsval *basicVal);
+    static JSBool marshallDictObject(JSContext *ctx, JSObject *obj, /*DBusMessage *,*/ DBusMessageIter *);
 
     static JSBool marshallTypedJSObject(JSContext* ctx, JSObject* aObj, DBusMessageIter* iter);
 
     static JSBool marshallJSObject(JSContext* ctx, JSObject* aObj, DBusMessageIter* iter);
+    static JSBool marshallJSArray(JSContext* ctx, JSObject* aObj, DBusMessageIter* iter);
     static JSBool marshallJSProperty(JSContext* ctx, JSObject* aObj, jsval& propval, DBusMessageIter* iter, const JSBool& isVariant);
     static JSBool JSObjectHasVariantValues(JSContext* ctx, JSObject* obj);
 
@@ -78,9 +82,8 @@ extern JSClass DBusError_jsClass; ///< js dbus error object
 #define enforce_notnull(_exp)      \
          check_args( (_exp), "are we oom?")
 
-
 extern int indent;
-#define DEBUG_LEVEL 1
+#define DEBUG_LEVEL 3
 #define ind() { int _i=indent; while(_i--) { cerr << "  ";} }
 
 #define dbg(x) if (DEBUG_LEVEL>=1) { ind(); x ; }
@@ -103,3 +106,21 @@ static inline int dbus_iter_length(DBusMessageIter* iter) {
     }
     return length;
 }
+
+extern JSClass DBusDict_jsClass;
+extern JSClass DBusResult_jsClass;
+#include <iostream>
+using namespace std;
+
+static inline bool isDictObject(JSObject* obj) { 
+    JSClass* cls =  JS_GetClass(obj);
+//	cerr << hex << " isDict? cls= " << cls << " against " << &DBusDict_jsClass << dec << endl;
+	return (cls == &DBusDict_jsClass);
+}
+
+static inline bool jsvalIsDictObject(jsval propkey) { 
+	JSObject* obj = JSVAL_TO_OBJECT(propkey);
+	return isDictObject(obj);
+}
+
+

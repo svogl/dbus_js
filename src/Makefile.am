@@ -1,4 +1,4 @@
-lib_LTLIBRARIES=libdbus_js.la libbluez_js.la
+lib_LTLIBRARIES=libdbus_js.la 
 
 AM_CPPFLAGS=-Wall -I. -DXP_UNIX -DOSSP -DEXPORT_JS_API -DJS_HAS_FILE_OBJECT -DHAVE_CONFIG_H
 
