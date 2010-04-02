@@ -84,6 +84,8 @@ extern JSClass DBusError_jsClass; ///< js dbus error object
 
 extern int indent;
 #define DEBUG_LEVEL 3
+#define DEBUG_DBUS_LOWLEVEL
+
 #define ind() { int _i=indent; while(_i--) { cerr << "  ";} }
 
 #define dbg(x) if (DEBUG_LEVEL>=1) { ind(); x ; }
