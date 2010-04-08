@@ -4,7 +4,6 @@
 
 using namespace std;
 
-
 int indent = 0;
 
 JSBool
@@ -37,7 +36,7 @@ JSBool DBusMarshalling::marshallBasicValue(JSContext *cx, JSObject *obj, /*DBusM
                 &iv);
     } else if (JSVAL_IS_STRING(*val)) {
         JSString* sv = JSVAL_TO_STRING(*val);
-        jschar* jv = JS_GetStringChars(sv);
+        //jschar* jv = JS_GetStringChars(sv);
         //fprintf(stderr, ".. a string  %02x %02x %02x %02x!\n",jv[0],jv[1],jv[2],jv[3]);
         char* cv = JS_GetStringBytes(sv);
         ret = dbus_message_iter_append_basic(iter,
@@ -63,7 +62,7 @@ JSBool DBusMarshalling::marshallBasicValue(JSContext *cx, JSObject *obj, /*DBusM
                 if (JSVAL_IS_OBJECT(*val))
                     dbg2_err("its an object!");
 
-                JSObject* ov = JSVAL_TO_OBJECT(*val);
+                //JSObject* ov = JSVAL_TO_OBJECT(*val);
 
                 dbg2_err("...uuuund? was machma damit??? a object im basic. sollma den source marshallen? ");
             }
@@ -140,7 +139,7 @@ JSBool DBusMarshalling::marshallVariant(JSContext *cx, JSObject *obj, /*DBusMess
                 if (JS_IsArrayObject(cx, ov)) {
                     dbg2_err("...aha!");
                     ret = marshallJSArray(cx, ov, iter);
-                } else if (isDictObject(ov)) {
+                } else if (isDictObject(cx, ov)) {
                     dbg2_err("...dudu!");
                     ret = marshallDictObject(cx, ov, iter);
                 } else {
@@ -207,9 +206,9 @@ DBusMarshalling::marshallJSArray(JSContext* cx,
     jsval propkey;
     JS_GetPropertyById(cx, arrayObj, values->vector[0], &propkey);
     JSObject* obj = JSVAL_TO_OBJECT(propkey);
-    JSClass* cls = JS_GetClass(obj);
+    JSClass* cls = JS_GetClass(cx, obj);
 
-    if (jsvalIsDictObject(propkey) ) {
+    if (jsvalIsDictObject(cx, propkey) ) {
         dbg2_err("ITS A DICT OBJECT!");
         isDict = true;
         enforce_notnull(

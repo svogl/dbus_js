@@ -62,7 +62,7 @@ static JSBool DBus_addSigHandler(JSContext *ctx, JSObject *obj, uintN argc, jsva
     dbusData* dta = (dbusData *) JS_GetPrivate(ctx, obj);
 
     // update:: use one dict object for matching
-    if (argc == 1 && jsvalIsDictObject(argv[0])) {
+    if (argc == 1 && jsvalIsDictObject(ctx, argv[0])) {
         // dict entries contain match rule:
         JSObject* opts = JSVAL_TO_OBJECT(argv[0]);
         jsval arg;
@@ -885,10 +885,11 @@ JSObject* DBusInit(JSContext *ctx, JSObject *obj) {
             0, NULL, 0);
 
     // error obj
-    JS_InitClass(ctx, obj, NULL,
+    return JS_InitClass(ctx, obj, NULL,
             &DBusError_jsClass,
             DBusObjConstructor, 0, NULL, // properties
             0, NULL, 0);
+	
 }
 
 /*************************************************************************************************/

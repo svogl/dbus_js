@@ -83,7 +83,7 @@ extern JSClass DBusError_jsClass; ///< js dbus error object
          check_args( (_exp), "are we oom?")
 
 extern int indent;
-#define DEBUG_LEVEL 3
+#define DEBUG_LEVEL 1
 #define DEBUG_DBUS_LOWLEVEL
 
 #define ind() { int _i=indent; while(_i--) { cerr << "  ";} }
@@ -114,15 +114,15 @@ extern JSClass DBusResult_jsClass;
 #include <iostream>
 using namespace std;
 
-static inline bool isDictObject(JSObject* obj) { 
-    JSClass* cls =  JS_GetClass(obj);
+static inline bool isDictObject(JSContext* ctx, JSObject* obj) { 
+    JSClass* cls =  JS_GetClass(ctx, obj);
 //	cerr << hex << " isDict? cls= " << cls << " against " << &DBusDict_jsClass << dec << endl;
 	return (cls == &DBusDict_jsClass);
 }
 
-static inline bool jsvalIsDictObject(jsval propkey) { 
+static inline bool jsvalIsDictObject(JSContext* ctx, jsval propkey) { 
 	JSObject* obj = JSVAL_TO_OBJECT(propkey);
-	return isDictObject(obj);
+	return isDictObject(ctx, obj);
 }
 
 
