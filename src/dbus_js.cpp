@@ -233,7 +233,7 @@ static JSBool DBus_requestBusName(JSContext *ctx, JSObject *obj, uintN argc, jsv
     DBusConnection *connection = dta->connection;
     DBusError dbus_error;
 
-    check_args(argc == 3, "argc must be 1!");
+    check_args( (argc == 1), "argc must be 1!");
     check_args(JSVAL_IS_STRING(argv[0]), "arg[0] must be a string (bus name)!");
 
     JSString* busName = JSVAL_TO_STRING(argv[0]);
@@ -438,7 +438,7 @@ static void printer(DBusMessageIter* iter) {
 DBusHandlerResult
 filter_func(DBusConnection* connection, DBusMessage* message, void* user_data) {
     dbusData* dta = (dbusData*) user_data;
-
+    int type = dbus_message_get_type(message);
     const char *interface;
     const char *name;
     const char *path;
@@ -461,7 +461,7 @@ filter_func(DBusConnection* connection, DBusMessage* message, void* user_data) {
     cout << "----- filter handlers." << endl;
 #endif
 
-    if (dbus_message_get_type(message) == DBUS_MESSAGE_TYPE_SIGNAL) {
+    if (type == DBUS_MESSAGE_TYPE_SIGNAL) {
 
         key = path;
         key += "/";
@@ -543,6 +543,29 @@ filter_func(DBusConnection* connection, DBusMessage* message, void* user_data) {
 
         delete vector;
         return DBUS_HANDLER_RESULT_HANDLED;
+    } else if (type == DBUS_MESSAGE_TYPE_SIGNAL) {
+        //we have exposed objects?!
+        key = path;
+        key += "/";
+        key += interface;
+        cerr << "filter_func ocall: key::" << key << endl;
+
+        if (strcmp("/", path) == 0) {
+
+        }
+
+        /***
+             * <!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
+             * "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
+             * <node>
+             *   <interface name="org.freedesktop.DBus.Introspectable">
+             *     <method name="Introspect">
+             *       <arg name="xml_data" type="s" direction="out"/>
+             *     </method>
+             *   </interface>
+             *   <node name="com"/>
+             * </node>\n'
+         */
     } else {
 #ifdef DEBUG_DBUS_LOWLEVEL
         switch (dbus_message_get_type(message)) {
