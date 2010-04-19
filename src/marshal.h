@@ -32,9 +32,9 @@ public:
 
     static JSBool marshallVariant(JSContext *ctx, JSObject *obj, /*DBusMessage *,*/ DBusMessageIter *, jsval *);
 
+    static JSBool marshallBasicValue(JSContext *ctx, JSObject *obj, /*DBusMessage *,*/ DBusMessageIter *, jsval *basicVal);
 private:
 
-    static JSBool marshallBasicValue(JSContext *ctx, JSObject *obj, /*DBusMessage *,*/ DBusMessageIter *, jsval *basicVal);
     static JSBool marshallDictObject(JSContext *ctx, JSObject *obj, /*DBusMessage *,*/ DBusMessageIter *);
 
     static JSBool marshallTypedJSObject(JSContext* ctx, JSObject* aObj, DBusMessageIter* iter);
@@ -83,7 +83,7 @@ extern JSClass DBusError_jsClass; ///< js dbus error object
          check_args( (_exp), "are we oom?")
 
 extern int indent;
-#define DEBUG_LEVEL 1
+#define DEBUG_LEVEL 3
 #define DEBUG_DBUS_LOWLEVEL
 
 #define ind() { int _i=indent; while(_i--) { cerr << "  ";} }

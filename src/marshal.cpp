@@ -1,7 +1,11 @@
 #include "marshal.h"
 #include <string.h>
 #include <iostream>
-
+/*
+#include <jsobj.h>
+#include <jsprvtd.h>
+#include <jsxml.h> // js xml support -> convert to string on return.
+*/
 using namespace std;
 
 int indent = 0;
@@ -142,8 +146,17 @@ JSBool DBusMarshalling::marshallVariant(JSContext *cx, JSObject *obj, /*DBusMess
                 } else if (isDictObject(cx, ov)) {
                     dbg2_err("...dudu!");
                     ret = marshallDictObject(cx, ov, iter);
+                    /*
+                } else if (OBJECT_IS_XML(cx,ov)) {
+                    JSClass* cls = JS_GET_CLASS(cx, ov);
+                    dbg2_err("..xml! " << cls->name);
+                    JSString *str = js_ValueToXMLString(cx, *val);
+                    cerr << "xmlstr " << JS_GetStringBytes(str) << endl << endl;
+
+                     * */
                 } else {
-                    dbg2_err("..oho!");
+                    JSClass* cls = JS_GET_CLASS(cx, ov);
+                    dbg2_err("..oho! " << cls->name);
                     ret = marshallJSObject(cx, ov, iter);
                 }
             }
@@ -208,7 +221,7 @@ DBusMarshalling::marshallJSArray(JSContext* cx,
     JSObject* obj = JSVAL_TO_OBJECT(propkey);
     JSClass* cls = JS_GetClass(cx, obj);
 
-    if (jsvalIsDictObject(cx, propkey) ) {
+    if (jsvalIsDictObject(cx, propkey)) {
         dbg2_err("ITS A DICT OBJECT!");
         isDict = true;
         enforce_notnull(
@@ -259,15 +272,15 @@ DBusMarshalling::marshallDictObject(JSContext* cx,
 
     cerr << "iter sig " << dbus_message_iter_get_signature(iter) << endl;
     enforce_notnull(
-       dbus_message_iter_open_container(iter, DBUS_TYPE_ARRAY,
+            dbus_message_iter_open_container(iter, DBUS_TYPE_ARRAY,
             DBUS_TYPE_ARRAY_AS_STRING
             DBUS_DICT_ENTRY_BEGIN_CHAR_AS_STRING
             DBUS_TYPE_STRING_AS_STRING
-//		DBUS_TYPE_STRING_AS_STRING
+            //		DBUS_TYPE_STRING_AS_STRING
             DBUS_TYPE_VARIANT_AS_STRING
             DBUS_DICT_ENTRY_END_CHAR_AS_STRING
             , &container_iter));
-    cerr << "  container_iter sig " << dbus_message_iter_get_signature(&container_iter) << endl ;
+    cerr << "  container_iter sig " << dbus_message_iter_get_signature(&container_iter) << endl;
 
     JSIdArray* values = JS_Enumerate(cx, dictObj);
     dbg3_err("marshalling dict l=" << values->length);
@@ -275,7 +288,7 @@ DBusMarshalling::marshallDictObject(JSContext* cx,
     for (int i = 0; i < values->length; i++) {
         jsval propkey = 0;
         jsval propval = 0;
-//#define INCONT
+        //#define INCONT
 #ifdef INCONT
         DBusMessageIter &dict_iter = container_iter;
 #else
@@ -343,8 +356,12 @@ DBusMarshalling::marshallJSObject(JSContext* cx,
         DBusMessageIter* iter) {
     DBusMessageIter container_iter;
     int rv;
+    jsval oval = OBJECT_TO_JSVAL(aObj);
+
+    JSVAL_LOCK(cx,oval);
 
     JSBool hasVariantValues = JSObjectHasVariantValues(cx, aObj);
+
     enforce_notnull(
             dbus_message_iter_open_container(iter, DBUS_TYPE_ARRAY,
             DBUS_DICT_ENTRY_BEGIN_CHAR_AS_STRING
@@ -353,18 +370,22 @@ DBusMarshalling::marshallJSObject(JSContext* cx,
             DBUS_DICT_ENTRY_END_CHAR_AS_STRING,
             &container_iter));
 
+    
+    cerr << "propiter" << endl;
+
     JSObject* js_iter = JS_NewPropertyIterator(cx, aObj);
     jsid propid;
     if (!JS_NextProperty(cx, js_iter, &propid)) {
-        return JS_FALSE;
+        goto fail;//return JS_FALSE;
     }
+    cerr << "propiter2" << endl;
 
     while (propid != JSVAL_VOID) {
         jsval propval;
         JSString *snam = NULL;
 
         if (!JS_IdToValue(cx, propid, &propval))
-            return JS_FALSE;
+            goto fail;//return JS_FALSE;
         cerr << "marshJSO" << endl;
         if (JSVAL_IS_STRING(propval)) {
             char* name = NULL;
@@ -379,13 +400,18 @@ DBusMarshalling::marshallJSObject(JSContext* cx,
                 hasVariantValues);
 
         if (!JS_NextProperty(cx, js_iter, &propid)) {
-            return JS_FALSE;
+            goto fail;//return JS_FALSE;
         }
     }
 
     dbus_message_iter_close_container(iter, &container_iter);
     printf("marshalled object\n");
+
+    JSVAL_UNLOCK(cx,oval);
     return JS_TRUE;
+    fail:
+    JSVAL_UNLOCK(cx,oval);
+    return JS_FALSE;
 }
 
 JSBool
