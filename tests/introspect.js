@@ -43,21 +43,20 @@ function Introspectable(bus) {
 	this.Introspect = function() {
 		print("INTROSPECT -->");
 
+		head = '<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN" "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">';
 		ret = <node/>;
 		try {
-			for each (dir in this.root.dirs) {
-			print("dn "+dir);
-				n = <node name={dir.name} />;
-				ret.node += n;
-			}
 			for each (srv in this.root.services) {
 				ret.node += srv._sig;
 			}
+			for each (dir in this.root.dirs) {
+				n = <node name={dir.name} />;
+				ret.node += n;
+			}
 		} catch (e) {
-		print("CAUGHT AN " + e);
-		//return "<node/>";
+			print("CAUGHT AN " + e);
 		}
-		return ret.toXMLString();
+		return head+ret.toXMLString();
 	}
 
 	this.expose = function(oPath, service) {
@@ -73,7 +72,6 @@ print("path "+path);
 					d.name=comp;
 					d.services[this._bus._intro._iface] = this._bus._intro; // add introspection
 					path.dirs[comp]=d;
-					//path[comp]=d;
 				}
 				path = path.dirs[comp];
 			//} else {
@@ -101,8 +99,8 @@ intro.expose("/", intro);
 bus.export("/", intro._iface, intro); 
 
 
-//hello = new Hello();
-//bus._intro.expose("/foo", hello);
+hello = new Hello();
+intro.expose("/", hello);
 
 //intro.test();
 //bus._intro.test();

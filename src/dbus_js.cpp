@@ -612,31 +612,29 @@ static DBusHandlerResult handleMethodCall(DBusConnection* connection, DBusMessag
 
     if (ret == JS_FALSE) {
         cerr << "FALSE" << endl;
+        // TODO: Send a DBUS Exception
     }
+
+
+    // create a reply from the message
+    DBusMessage* reply = dbus_message_new_method_return(message);
+
     // now check the return value
     if (JSVAL_IS_NULL(rval) || JSVAL_IS_VOID(rval)) {
         // no return value - nothing to do
         dbg2_err("no return value");
-        return DBUS_HANDLER_RESULT_HANDLED;
-    }
-    if (JSVAL_IS_STRING(rval)) {
-        dbg2_err("ret is string");
-    }
-    if (JSVAL_IS_OBJECT(rval)) {
-        JSObject* o = JSVAL_TO_OBJECT(rval);
-        dbg2_err("ret is obj " << hex << o << dec);
-    }
-    // create a reply from the message
-    DBusMessage* reply = dbus_message_new_method_return(message);
-    DBusMessageIter iter;
-    dbus_message_iter_init_append(reply, &iter);
+    } else {
+        // append result.
+        DBusMessageIter iter;
+        dbus_message_iter_init_append(reply, &iter);
 
-    ret = DBusMarshalling::marshallVariant(dta->ctx, cbObj, &iter, &rval);
+        ret = DBusMarshalling::marshallVariant(dta->ctx, cbObj, &iter, &rval);
+    }
 
     // send the reply && flush the connection
     if (!dbus_connection_send(connection, reply, &serial)) {
         fprintf(stderr, "Out Of Memory!\n");
-        exit(1);
+        exit(1); /// TODO: define strategy..!
     } else {
         cerr << "serial " << serial << endl;
     }
@@ -666,7 +664,7 @@ static DBusHandlerResult handleCoreSignal(DBusConnection* connection, DBusMessag
         dta->busNames[val] = NULL;
     } else if (strcmp("NameOwnerChanged", name) == 0) {
     } else {
-            dbg2_err("unhandled core signal :: " << name);
+        dbg2_err("unhandled core signal :: " << name);
     }
     return DBUS_HANDLER_RESULT_HANDLED;
 }
@@ -788,16 +786,16 @@ filter_func(DBusConnection* connection, DBusMessage* message, void* user_data) {
 
         //we are addressed?!
         const char* dest = dbus_message_get_destination(message);
-        map<string, void*>::iterator iter =  dta->busNames.find(dest);
-        if (iter != dta->busNames.end() ) {
+        map<string, void*>::iterator iter = dta->busNames.find(dest);
+        if (iter != dta->busNames.end()) {
             cerr << "name " << iter->first << endl;
         } else {
             cerr << "no entry for " << dest << endl;
         }
-        if (dest && dta->busNames.find(dest) != dta->busNames.end() ) {
+        if (dest && dta->busNames.find(dest) != dta->busNames.end()) {
             cerr << "holla, wir sans\n";
         } else {
-            cerr << "fnk. no for " << dest << " " << name <<  endl;
+            cerr << "fnk. no for " << dest << " " << name << endl;
             return DBUS_HANDLER_RESULT_HANDLED;
         }
 
