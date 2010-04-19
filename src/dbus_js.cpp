@@ -78,10 +78,17 @@ typedef struct _dbus {
 
     map<string, objInfo*> expObjects;
 
+    map<string, void*> busNames;
+
     pathInfo root;
 } dbusData;
 
+/// private data for the dbus message object
 
+typedef struct _msg {
+    DBusConnection* con;
+    DBusMessage* msg;
+} msgData;
 
 
 ////////////////////////////////////////
@@ -526,10 +533,10 @@ JSBool DBusArgsToJsvalArray(JSContext *ctx, DBusMessage* message, int* len, jsva
 }
 
 JSBool DBusArgsToArrayObj(JSContext *ctx, DBusMessage* message, int* len, JSObject** argObj) {
-    jsval* vec=0;
-    int l=0;
+    jsval* vec = 0;
+    int l = 0;
 
-    DBusArgsToJsvalArray(ctx,message, &l, &vec);
+    DBusArgsToJsvalArray(ctx, message, &l, &vec);
 
     JSObject * args = JS_NewArrayObject(ctx, l, vec);
 
@@ -537,6 +544,17 @@ JSBool DBusArgsToArrayObj(JSContext *ctx, DBusMessage* message, int* len, JSObje
     *argObj = args;
     return JS_TRUE;
 }
+
+
+#define ensure_val_is_object_or_fail(ret, val)  \
+    if ((ret) == JS_FALSE || JSVAL_IS_VOID(val) || JSVAL_IS_NULL(val)) { \
+        dbg2_err("handleMethodCall - no keys entry found in bus object"); \
+        return DBUS_HANDLER_RESULT_HANDLED; \
+    } \
+    if (!JSVAL_IS_OBJECT(val)) { \
+        dbg2_err("keyval must be a (key map) object!"); \
+        return DBUS_HANDLER_RESULT_HANDLED; \
+    }
 
 /** handleMethodCall is triggered if a method call addresses this connection or it does not have
  * a fixed destination set. Anyway, we forward the call to the js layer for further handling.
@@ -547,49 +565,27 @@ static DBusHandlerResult handleMethodCall(DBusConnection* connection, DBusMessag
     jsval val;
     JSBool ret;
     const char* method = dbus_message_get_member(message);
+    const char* path = dbus_message_get_path(message);
 
     string key = dbus_message_get_path(message);
     key += "_";
     key += dbus_message_get_interface(message);
 
-    JS_GetProperty(dta->ctx, bus, "keys", &val);
-    if (JSVAL_IS_VOID(val) || JSVAL_IS_NULL(val)) {
-        dbg2_err("handleMethodCall - no keys entry found in bus object");
-        return DBUS_HANDLER_RESULT_HANDLED;
-    }
-    if (!JSVAL_IS_OBJECT(val)) {
-        dbg2_err("keyval must be a (key map) object!");
-        // TODO: send back a dbusexception
-        return DBUS_HANDLER_RESULT_HANDLED;
-    }
+    ret = JS_GetProperty(dta->ctx, bus, "keys", &val);
+    ensure_val_is_object_or_fail(ret, val);
     JSObject* keys = JSVAL_TO_OBJECT(val);
 
     // keys entry: oPath + service._iface
+
     // -> get the service object
-    JS_GetProperty(dta->ctx, keys, key.c_str(), &val);
-    if (JSVAL_IS_VOID(val) || JSVAL_IS_NULL(val)) {
-        dbg2_err("handleMethodCall - no obj entry found in keys object");
-        return DBUS_HANDLER_RESULT_HANDLED;
-    }
-    if (!JSVAL_IS_OBJECT(val)) {
-        dbg2_err("val must be a (service) object!");
-        // TODO: send back a dbusexception
-        return DBUS_HANDLER_RESULT_HANDLED;
-    }
+    ret = JS_GetProperty(dta->ctx, keys, key.c_str(), &val);
+    ensure_val_is_object_or_fail(ret, val);
     JSObject* srv = JSVAL_TO_OBJECT(val);
 
     // check for function name:
     JS_GetProperty(dta->ctx, srv, method, &val);
-    if (JSVAL_IS_VOID(val) || JSVAL_IS_NULL(val)) {
-        dbg2_err("handleMethodCall - function not found: " << method);
-        // TODO: send back a dbusexception
-        return DBUS_HANDLER_RESULT_HANDLED;
-    }
+    ensure_val_is_object_or_fail(ret, val);
     JSObject* cbObj = JSVAL_TO_OBJECT(val);
-    if (cbObj == NULL) {
-        dbg_err("internal error - callback is null; you should check a little more...");
-        return DBUS_HANDLER_RESULT_HANDLED;
-    }
     if (!JS_ObjectIsFunction(dta->ctx, cbObj)) {
         cerr << " key->value should be a callback.\n";
         return DBUS_HANDLER_RESULT_HANDLED;
@@ -598,11 +594,11 @@ static DBusHandlerResult handleMethodCall(DBusConnection* connection, DBusMessag
     dbg2_err("handleMethodCall - CALL!");
     JSFunction* callback = JS_ValueToFunction(dta->ctx, val);
     fflush(stdout);
-    
+
     int argc;
     JSObject* methArg;
     jsval* argv;
-    //DBusArgsToArrayObj(dta->ctx, message, &argc, &methArg);
+
     DBusArgsToJsvalArray(dta->ctx, message, &argc, &argv);
 
     dbus_uint32_t serial = 0;
@@ -613,19 +609,22 @@ static DBusHandlerResult handleMethodCall(DBusConnection* connection, DBusMessag
     cerr << "func call argc " << argc << endl;
     ret = JS_CallFunction(dta->ctx, srv, callback, argc, argv, &rval);
     cerr << "function return value " << ret << endl;
-    if (ret == JS_FALSE) { cerr << "FALSE" << endl; }
+
+    if (ret == JS_FALSE) {
+        cerr << "FALSE" << endl;
+    }
     // now check the return value
-    if (JSVAL_IS_NULL(rval) || JSVAL_IS_VOID(rval) ) {
+    if (JSVAL_IS_NULL(rval) || JSVAL_IS_VOID(rval)) {
         // no return value - nothing to do
         dbg2_err("no return value");
-        return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+        return DBUS_HANDLER_RESULT_HANDLED;
     }
-    if (JSVAL_IS_STRING(rval) ) {
+    if (JSVAL_IS_STRING(rval)) {
         dbg2_err("ret is string");
     }
-    if (JSVAL_IS_OBJECT(rval) ) {
+    if (JSVAL_IS_OBJECT(rval)) {
         JSObject* o = JSVAL_TO_OBJECT(rval);
-        dbg2_err("ret is obj " << hex << o << dec );
+        dbg2_err("ret is obj " << hex << o << dec);
     }
     // create a reply from the message
     DBusMessage* reply = dbus_message_new_method_return(message);
@@ -648,6 +647,30 @@ static DBusHandlerResult handleMethodCall(DBusConnection* connection, DBusMessag
     return DBUS_HANDLER_RESULT_HANDLED;
 }
 
+static const string corePath = "/org/freedesktop/DBus";
+static const string coreInterface = "org.freedesktop.DBus";
+
+static DBusHandlerResult handleCoreSignal(DBusConnection* connection, DBusMessage* message, dbusData* dta) {
+    const char *name;
+    name = dbus_message_get_member(message);
+    DBusMessageIter iter;
+
+    if (strcmp("NameAcquired", name) == 0) {
+        string n;
+        char *val;
+
+        dbus_message_iter_init(message, &iter);
+        dbus_message_iter_get_basic(&iter, &val);
+        dbg2_err("string [" << val << "]");
+        n = val;
+        dta->busNames[val] = NULL;
+    } else if (strcmp("NameOwnerChanged", name) == 0) {
+    } else {
+            dbg2_err("unhandled core signal :: " << name);
+    }
+    return DBUS_HANDLER_RESULT_HANDLED;
+}
+
 DBusHandlerResult
 filter_func(DBusConnection* connection, DBusMessage* message, void* user_data) {
     dbusData* dta = (dbusData*) user_data;
@@ -663,6 +686,11 @@ filter_func(DBusConnection* connection, DBusMessage* message, void* user_data) {
     path = dbus_message_get_path(message);
 
     if (type == DBUS_MESSAGE_TYPE_SIGNAL) {
+
+        if (corePath.compare(path) == 0 && coreInterface.compare(interface) == 0) {
+            dbg2_err("handle core signal :: " << name);
+            return handleCoreSignal(connection, message, dta);
+        }
 
         key = path;
         key += "/";
@@ -758,16 +786,20 @@ filter_func(DBusConnection* connection, DBusMessage* message, void* user_data) {
         return DBUS_HANDLER_RESULT_HANDLED;
     } else if (type == DBUS_MESSAGE_TYPE_METHOD_CALL) {
 
-
         //we are addressed?!
-        const char*dest = dbus_message_get_destination(message);
-        if (dest && !dta->unique_name.compare(dest)) {
+        const char* dest = dbus_message_get_destination(message);
+        map<string, void*>::iterator iter =  dta->busNames.find(dest);
+        if (iter != dta->busNames.end() ) {
+            cerr << "name " << iter->first << endl;
+        } else {
+            cerr << "no entry for " << dest << endl;
+        }
+        if (dest && dta->busNames.find(dest) != dta->busNames.end() ) {
             cerr << "holla, wir sans\n";
         } else {
-            cerr << "fnk. no for " << dest << endl;
+            cerr << "fnk. no for " << dest << " " << name <<  endl;
             return DBUS_HANDLER_RESULT_HANDLED;
         }
-
 
         return handleMethodCall(connection, message, dta);
 
@@ -1091,7 +1123,7 @@ static JSBool DBus_s_sessionBus(JSContext *ctx, JSObject *obj, uintN argc, jsval
 
     JSObject* keys = JS_NewObject(ctx, &DBus_jsClass, NULL, NULL);
     jsval kv = OBJECT_TO_JSVAL(keys);
-    JS_SetProperty(ctx,bus,"keys",&kv);
+    JS_SetProperty(ctx, bus, "keys", &kv);
 
     if (JS_FALSE == _DBus_connect(dta, DBUS_BUS_SESSION)) {
         return JS_FALSE;
