@@ -3,6 +3,25 @@
  */
 DSO.load("dbus"); 
 
+function Hello() {
+	this._iface = "at.beko.Hello";
+	this._sig =   <interface name="at.beko.Hello">
+						<method name="Hello">
+						  <arg name="who" type="s" direction="in"/>
+						</method>
+						<method name="Who">
+						  <arg name="who" type="s" direction="out"/>
+						</method>
+					  </interface>;
+	this.Hello = function(who) {
+		print("Hello, " + who);
+	}
+	this.Who = function() {
+		return "world";
+	}
+}
+
+
 function DirInfo() {
 	this.name=""; 
 	this.dirs = new Object();
@@ -23,34 +42,22 @@ function Introspectable(bus) {
 
 	this.Introspect = function() {
 		print("INTROSPECT -->");
-		this.test();
-		//ret = "";
+
 		ret = <node/>;
 		try {
-			print("INTROSPECT --> me " + this);
-			print("INTROSPECT --> iface " + this._iface);
-			print("INTROSPECT --> bus " + this._bus);
-	//return "<node/>";
-			if (this._bus.keys == null) {
-				print("INTROSPECT --> keys null" );
-			} else {
-				print("INTROSPECT --> keys not null" );
+			for each (dir in this.root.dirs) {
+			print("dn "+dir);
+				n = <node name={dir.name} />;
+				ret.node += n;
 			}
-			print("INTROSPECT -->" + this._bus.keys);
-			print("INTROSPECT -->" + this._bus.keys);
-			print("INTROSPECT -->" + this._bus.keys);
-			for each (key in this._bus.keys) {
-				//n = <node/>;
-				//n.name = key;
-				//ret += n;
-				print("k " + key);
+			for each (srv in this.root.services) {
+				ret.node += srv._sig;
 			}
-			print("INTROSPECT ::::: " + ret + " ::::::");
 		} catch (e) {
 		print("CAUGHT AN " + e);
-		return "<node/>";
+		//return "<node/>";
 		}
-		return ""+ret;
+		return ret.toXMLString();
 	}
 
 	this.expose = function(oPath, service) {
@@ -65,37 +72,22 @@ print("path "+path);
 					d = new DirInfo();
 					d.name=comp;
 					d.services[this._bus._intro._iface] = this._bus._intro; // add introspection
-					path[comp]=d;
+					path.dirs[comp]=d;
+					//path[comp]=d;
 				}
-				path = path[comp];
+				path = path.dirs[comp];
 			//} else {
 				// we're at the end of a path ending with slash ../../ or at root
 				// we hope for the latter.
 				// simply continue
 			}
 		}
+print("p|| " +path.name);
 		path.services[service._iface] = service;
 		this._bus.keys[ oPath + "_" + service._iface ] = service;
 	}
 
 	this.test = function() {
-		try {
-			print("PECT --> me " + this);
-			print("PECT --> iface " + this._iface);
-			print("PECT --> bus " + this._bus);
-			print("PECT -->" + this._bus.keys);
-			if (this._bus.keys == null) {
-				print("PECT --> keys null" );
-			} else {
-				print("PECT --> keys not null" );
-				for each (key in this._bus.keys) {
-					print("    k " + key + " " + this._bus.keys[key]);
-				}
-			}
-			print("PECT ::::: " + ret + " ::::::");
-		} catch (e) {
-			print("CAUGHT AN " + e);
-		}
 	}
 }
 
@@ -105,15 +97,16 @@ print("KEYS::: " + bus.keys);
 intro = new Introspectable(bus);
 
 bus._intro = intro;
-
 intro.expose("/", intro);
-intro.expose("/foobar", intro);
-
-
 bus.export("/", intro._iface, intro); 
 
-intro.test();
-bus._intro.test();
+
+//hello = new Hello();
+//bus._intro.expose("/foo", hello);
+
+//intro.test();
+//bus._intro.test();
+print(bus._intro.Introspect());
 
 bus.requestBusName("at.beko.inspect");
 
