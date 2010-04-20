@@ -262,6 +262,12 @@ static JSBool DBus_exportObject(JSContext *ctx, JSObject *obj, uintN argc, jsval
     obi->interface = JS_GetStringBytes(iFace);
     obi->callback = argv[2];
 
+    matchRule += "type='method_call',path='";
+    matchRule += JS_GetStringBytes(oPath);
+    matchRule += "',interface='";
+    matchRule += JS_GetStringBytes(iFace);
+    matchRule += "'";
+
     dbus_error_init(&dbus_error);
     dbus_bus_add_match(dta->connection, matchRule.c_str(), &dbus_error);
     check_dbus_error(dbus_error);
@@ -514,13 +520,15 @@ static void printer(DBusMessageIter* iter) {
 JSBool DBusArgsToJsvalArray(JSContext *ctx, DBusMessage* message, int* len, jsval** vals) {
     DBusMessageIter iter;
     int length = 0;
+    jsval* vector;
+
     dbus_message_iter_init(message, &iter);
     while (dbus_message_iter_next(&iter)) {
         length++;
     }
     dbg3_err("length = " << length << endl);
 
-    jsval* vector = new jsval[length];
+    vector = new jsval[length];
 
     dbus_message_iter_init(message, &iter);
 
@@ -546,14 +554,24 @@ JSBool DBusArgsToArrayObj(JSContext *ctx, DBusMessage* message, int* len, JSObje
 }
 
 
-#define ensure_val_is_object_or_fail(ret, val)  \
+#define ensure_val_is_object_or_fail(con, message, ret, val, msg)  \
+    { bool send = false; \
     if ((ret) == JS_FALSE || JSVAL_IS_VOID(val) || JSVAL_IS_NULL(val)) { \
-        dbg2_err("handleMethodCall - no keys entry found in bus object"); \
-        return DBUS_HANDLER_RESULT_HANDLED; \
-    } \
+        dbg2_err("handleMethodCall - val is nil or void: " << msg); \
+        send = true; \
+    } else \
     if (!JSVAL_IS_OBJECT(val)) { \
-        dbg2_err("keyval must be a (key map) object!"); \
+        dbg2_err("val must be an object: " << msg); \
+        send = true; \
+    } \
+    if (send) { \
+        dbus_uint32_t ser=0; \
+        DBusMessage* err = dbus_message_new_error(message, "ObjectNotFound", msg); \
+        dbus_connection_send(con, err, &ser); \
+        dbus_connection_flush(con); \
+        dbus_message_unref(err); \
         return DBUS_HANDLER_RESULT_HANDLED; \
+        }\
     }
 
 /** handleMethodCall is triggered if a method call addresses this connection or it does not have
@@ -567,24 +585,29 @@ static DBusHandlerResult handleMethodCall(DBusConnection* connection, DBusMessag
     const char* method = dbus_message_get_member(message);
     const char* path = dbus_message_get_path(message);
 
+
+
     string key = dbus_message_get_path(message);
     key += "_";
     key += dbus_message_get_interface(message);
 
+    cerr << "*** bus obj " << hex<< bus << dec << endl;
+    cerr << "*** looking for key " << key << endl;
+
     ret = JS_GetProperty(dta->ctx, bus, "keys", &val);
-    ensure_val_is_object_or_fail(ret, val);
+    ensure_val_is_object_or_fail(connection, message, ret, val, "service keys hash");
     JSObject* keys = JSVAL_TO_OBJECT(val);
 
     // keys entry: oPath + service._iface
 
     // -> get the service object
     ret = JS_GetProperty(dta->ctx, keys, key.c_str(), &val);
-    ensure_val_is_object_or_fail(ret, val);
+    ensure_val_is_object_or_fail(connection, message, ret, val, "service object");
     JSObject* srv = JSVAL_TO_OBJECT(val);
 
     // check for function name:
     JS_GetProperty(dta->ctx, srv, method, &val);
-    ensure_val_is_object_or_fail(ret, val);
+    ensure_val_is_object_or_fail(connection, message, ret, val, "service method");
     JSObject* cbObj = JSVAL_TO_OBJECT(val);
     if (!JS_ObjectIsFunction(dta->ctx, cbObj)) {
         cerr << " key->value should be a callback.\n";
@@ -601,6 +624,17 @@ static DBusHandlerResult handleMethodCall(DBusConnection* connection, DBusMessag
 
     DBusArgsToJsvalArray(dta->ctx, message, &argc, &argv);
 
+    if (true) {
+        // prepend opath:
+        jsval* vals = new jsval[argc+1];
+        JSString* sp = JS_NewStringCopyZ(dta->ctx, path);
+        vals[0] = STRING_TO_JSVAL(sp);
+        memcpy(vals+1,argv,sizeof(jsval)*argc);
+        delete argv;
+        argv=vals;
+        argc++;
+    }
+
     dbus_uint32_t serial = 0;
 
     //  finally - the function call!
@@ -614,7 +648,6 @@ static DBusHandlerResult handleMethodCall(DBusConnection* connection, DBusMessag
         cerr << "FALSE" << endl;
         // TODO: Send a DBUS Exception
     }
-
 
     // create a reply from the message
     DBusMessage* reply = dbus_message_new_method_return(message);
@@ -783,19 +816,14 @@ filter_func(DBusConnection* connection, DBusMessage* message, void* user_data) {
         delete vector;
         return DBUS_HANDLER_RESULT_HANDLED;
     } else if (type == DBUS_MESSAGE_TYPE_METHOD_CALL) {
-
         //we are addressed?!
         const char* dest = dbus_message_get_destination(message);
-        map<string, void*>::iterator iter = dta->busNames.find(dest);
-        if (iter != dta->busNames.end()) {
-            cerr << "name " << iter->first << endl;
-        } else {
-            cerr << "no entry for " << dest << endl;
-        }
+
+        map<string, void*>::iterator iter;
         if (dest && dta->busNames.find(dest) != dta->busNames.end()) {
-            cerr << "holla, wir sans\n";
+            //cerr << "holla, wir sans\n";
         } else {
-            cerr << "fnk. no for " << dest << " " << name << endl;
+            //cerr << "fnk. no for " << dest << " " << name << endl;
             return DBUS_HANDLER_RESULT_HANDLED;
         }
 
@@ -973,6 +1001,8 @@ static JSBool DBusConstructor(JSContext *ctx, JSObject *obj, uintN argc, jsval *
         //dta = (dbusData*) calloc(sizeof (dbusData), 1);
         dta = new( dbusData);
 
+        cerr << "new DBus obj " << hex << dta << dec << endl;
+
         if (!JS_SetPrivate(ctx, obj, dta))
             return JS_FALSE;
         return JS_TRUE;
@@ -981,11 +1011,31 @@ static JSBool DBusConstructor(JSContext *ctx, JSObject *obj, uintN argc, jsval *
 }
 
 static void DBusDestructor(JSContext *ctx, JSObject *obj) {
-    printf("Destroying DBus object\n");
     dbusData* dta = (dbusData *) JS_GetPrivate(ctx, obj);
+    cerr << "delete DBus obj " << hex << dta << dec << endl;
     if (dta) {
         free(dta->name);
         delete (dta);
+
+        dbus_connection_unref(dta->connection);
+
+        map<string, callbackInfo*>::iterator cbI = dta->sigHandlers.begin();
+        while (cbI != dta->sigHandlers.end() ) {
+            delete cbI->second;
+            cbI++;
+        }
+
+        map<string, objInfo*>::iterator obI = dta->expObjects.begin();
+        while (obI != dta->expObjects.end() ) {
+            delete obI->second;
+            obI++;
+        }
+
+        map<string, void*>::iterator bnI = dta->busNames.begin();
+        while (bnI != dta->busNames.end() ) {
+            //delete bnI->second;
+            bnI++;
+        }
     }
 }
 
@@ -994,7 +1044,7 @@ static JSBool DBusObjConstructor(JSContext *ctx, JSObject *obj, uintN argc, jsva
 }
 
 static void DBusObjDestructor(JSContext *ctx, JSObject *obj) {
-    printf("Destroying DBus object\n");
+    printf("Destroying DBusObject\n");
 }
 
 /*************************************************************************************************/

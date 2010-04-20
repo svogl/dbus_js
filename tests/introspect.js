@@ -13,9 +13,11 @@ function Hello() {
 						  <arg name="who" type="s" direction="out"/>
 						</method>
 					  </interface>;
+
 	this.Hello = function(who) {
 		print("Hello, " + who);
 	}
+
 	this.Who = function() {
 		return "world";
 	}
@@ -27,6 +29,7 @@ function Quit() {
 						<method name="quit">
 						</method>
 				  </interface>;
+
 	this.quit = function() {
 		Glib.quit();
 	}
@@ -40,7 +43,6 @@ function DirInfo() {
 }
 
 function Introspectable(bus) {
-	print("init bus" + bus );
 	this._bus = bus;
 	this._iface = "org.freedesktop.DBus.Introspectable";
 	this._sig =   <interface name="org.freedesktop.DBus.Introspectable">
@@ -51,17 +53,30 @@ function Introspectable(bus) {
 
 	this.root = new DirInfo();
 
-	this.Introspect = function() {
-		print("INTROSPECT -->");
+	this.Introspect = function(path) {
+		print("INTROSPECT --> " + this);
 
-		head = '<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN" "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">';
+		head = '<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN" "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">\n';
 		ret = <node/>;
+
+		dir = this.root; 
+		p = path.split("/");
+		for each (comp in p) {
+			if (comp != "") {
+				if ( dir.dirs[comp] != null ) {
+					dir = dir.dirs[comp];
+				} else {
+					print("path component not found" + comp);
+					return head+ret;
+				}
+			}
+		}
 		try {
-			for each (srv in this.root.services) {
+			for each (srv in dir.services) {
 				ret.node += srv._sig;
 			}
-			for each (dir in this.root.dirs) {
-				n = <node name={dir.name} />;
+			for each (d in dir.dirs) {
+				n = <node name={d.name} />;
 				ret.node += n;
 			}
 		} catch (e) {
@@ -74,7 +89,7 @@ function Introspectable(bus) {
 		//enter into dir, pass along
 		p = oPath.split("/");
 		path = this.root;
-print("path "+path);
+//print("path "+path);
 		for each (comp in p) {
 			if (comp != "") {
 				// named path element. go down or add
@@ -83,6 +98,7 @@ print("path "+path);
 					d.name=comp;
 					d.services[this._bus._intro._iface] = this._bus._intro; // add introspection
 					path.dirs[comp]=d;
+					this._bus.export(oPath, this._iface, this); 
 				}
 				path = path.dirs[comp];
 			//} else {
@@ -91,13 +107,20 @@ print("path "+path);
 				// simply continue
 			}
 		}
-print("p|| " +path.name);
+//print("p|| " +path.name);
 		path.services[service._iface] = service;
-		this._bus.keys[ oPath + "_" + service._iface ] = service;
+		key = oPath + "_" + service._iface;
+		this._bus.keys[ key ] = service;
+		print("registered bus key  [" + key + "]");
+		this._bus.export(oPath, service._iface, service); 
 	}
 
 	this.test = function() {
 	}
+
+	// make introspection accessible by default:
+	this.expose("/", this);
+	this._bus._intro = this;
 }
 
 bus = DBus.sessionBus();
@@ -105,17 +128,17 @@ print("KEYS::: " + bus.keys);
 
 intro = new Introspectable(bus);
 
-bus._intro = intro;
-intro.expose("/", intro);
-bus.export("/", intro._iface, intro); 
+//bus._intro = intro;
+//intro.expose("/", intro);
 
 hello = new Hello();
-intro.expose("/", hello);
+intro.expose("/foo", hello);
 
 quit = new Quit();
 intro.expose("/", quit);
 
-print(bus._intro.Introspect());
+
+print(bus._intro.Introspect("/"));
 
 bus.requestBusName("at.beko.inspect");
 

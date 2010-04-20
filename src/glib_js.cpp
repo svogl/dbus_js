@@ -20,7 +20,7 @@
 using namespace std;
 
 
-    GMainLoop* mainloop = NULL;
+GMainLoop* mainloop = NULL;
 
 
 ////////////////////////////////////////
@@ -55,6 +55,7 @@ static void GlibDestructor(JSContext *cx, JSObject *obj) {
     if (dta) {
         free(dta->name);
         free(dta);
+        dta=NULL;
     }
 }
 
