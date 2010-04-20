@@ -88,34 +88,27 @@ function Introspectable(bus) {
 	this.expose = function(oPath, service) {
 		//enter into dir, pass along
 		p = oPath.split("/");
+		part = "";
 		path = this.root;
-//print("path "+path);
+
 		for each (comp in p) {
 			if (comp != "") {
 				// named path element. go down or add
 				if ( path[comp] == null) {
 					d = new DirInfo();
 					d.name=comp;
-					d.services[this._bus._intro._iface] = this._bus._intro; // add introspection
 					path.dirs[comp]=d;
-					this._bus.export(oPath, this._iface, this); 
+
+					// auto-export introspection:
+					part += "/"+comp;
+					d.services[this._iface] = this; // add introspection
+					this._bus.export(part, this._iface, this); 
 				}
 				path = path.dirs[comp];
-			//} else {
-				// we're at the end of a path ending with slash ../../ or at root
-				// we hope for the latter.
-				// simply continue
 			}
 		}
-//print("p|| " +path.name);
 		path.services[service._iface] = service;
-		key = oPath + "_" + service._iface;
-		this._bus.keys[ key ] = service;
-		print("registered bus key  [" + key + "]");
 		this._bus.export(oPath, service._iface, service); 
-	}
-
-	this.test = function() {
 	}
 
 	// make introspection accessible by default:
@@ -124,7 +117,6 @@ function Introspectable(bus) {
 }
 
 bus = DBus.sessionBus();
-print("KEYS::: " + bus.keys);
 
 intro = new Introspectable(bus);
 

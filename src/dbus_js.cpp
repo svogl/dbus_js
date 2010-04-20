@@ -40,20 +40,12 @@ typedef struct _cbi {
     jsval callback;
 } callbackInfo;
 
-typedef struct _obi {
-    string match;
-    string opath;
-    string interface;
-    jsval callback;
-} objInfo;
-
-typedef void (*serviceCallback)(DBusMessage* msg);
-
 typedef struct _exi {
     int flags; ///< jsobject implementing the sig.
+    JSObject* o; ///< the object implementing the interface
     jsval obj; ///< jsobject implementing the sig.
-    serviceCallback* cb; ///< if native service, callback ptr
     string interface; ///< the dbus interface
+    string path; ///< the dbus interface
     string signature; ///< the xml signature for introspection
 } expInfo;
 
@@ -76,7 +68,7 @@ typedef struct _dbus {
 
     map<string, callbackInfo*> sigHandlers;
 
-    map<string, objInfo*> expObjects;
+    map<string, expInfo*> expObjects;
 
     map<string, void*> busNames;
 
@@ -253,14 +245,15 @@ static JSBool DBus_exportObject(JSContext *ctx, JSObject *obj, uintN argc, jsval
     JSString* iFace = JSVAL_TO_STRING(argv[1]);
 
     key = JS_GetStringBytes(oPath);
-    key += "/";
+    key += "_";
     key += JS_GetStringBytes(iFace);
+    
+    dbg_err3( "export object - keykey " << key );
 
-    objInfo* obi = new(objInfo);
-    obi->match = key;
-    obi->opath = JS_GetStringBytes(oPath);
-    obi->interface = JS_GetStringBytes(iFace);
-    obi->callback = argv[2];
+    expInfo* exi = new expInfo;
+    exi->o = JSVAL_TO_OBJECT(argv[2]);
+    exi->interface = JS_GetStringBytes(iFace);
+    exi->path = JS_GetStringBytes(oPath);
 
     matchRule += "type='method_call',path='";
     matchRule += JS_GetStringBytes(oPath);
@@ -272,7 +265,7 @@ static JSBool DBus_exportObject(JSContext *ctx, JSObject *obj, uintN argc, jsval
     dbus_bus_add_match(dta->connection, matchRule.c_str(), &dbus_error);
     check_dbus_error(dbus_error);
 
-    dta->expObjects[key] = obi;
+    dta->expObjects[key] = exi;
 
     return JS_TRUE;
 }
@@ -556,7 +549,11 @@ JSBool DBusArgsToArrayObj(JSContext *ctx, DBusMessage* message, int* len, JSObje
 
 #define ensure_val_is_object_or_fail(con, message, ret, val, msg)  \
     { bool send = false; \
-    if ((ret) == JS_FALSE || JSVAL_IS_VOID(val) || JSVAL_IS_NULL(val)) { \
+    if ((ret) == JS_FALSE ) { \
+        dbg2_err("handleMethodCall - ret is false: " << msg); \
+        send = true; \
+    } else \
+    if (JSVAL_IS_VOID(val) || JSVAL_IS_NULL(val)) { \
         dbg2_err("handleMethodCall - val is nil or void: " << msg); \
         send = true; \
     } else \
@@ -566,7 +563,7 @@ JSBool DBusArgsToArrayObj(JSContext *ctx, DBusMessage* message, int* len, JSObje
     } \
     if (send) { \
         dbus_uint32_t ser=0; \
-        DBusMessage* err = dbus_message_new_error(message, "ObjectNotFound", msg); \
+        DBusMessage* err = dbus_message_new_error(message, "at.beko.Error.ObjectNotFound", msg); \
         dbus_connection_send(con, err, &ser); \
         dbus_connection_flush(con); \
         dbus_message_unref(err); \
@@ -598,13 +595,33 @@ static DBusHandlerResult handleMethodCall(DBusConnection* connection, DBusMessag
     ensure_val_is_object_or_fail(connection, message, ret, val, "service keys hash");
     JSObject* keys = JSVAL_TO_OBJECT(val);
 
+
+#if 0
     // keys entry: oPath + service._iface
 
     // -> get the service object
     ret = JS_GetProperty(dta->ctx, keys, key.c_str(), &val);
     ensure_val_is_object_or_fail(connection, message, ret, val, "service object");
     JSObject* srv = JSVAL_TO_OBJECT(val);
+#else
+    map<string, expInfo*>::iterator info = dta->expObjects.find(key);
+    JSObject* srv=NULL;
+    if(info != dta->expObjects.end() ) {
+        srv = info->second->o;
+        cerr << "found service entry at " << key << " o " << hex << srv << dec << endl;
+    } else {
+        cerr << "no service match for " << key << endl;
+        info = dta->expObjects.begin();
+        while (info != dta->expObjects.end() ) {
+            cerr << " exi " << info->first << endl;
+            info++;
+        }
+    }
+    ret = JS_TRUE;
+    val=OBJECT_TO_JSVAL(srv); // hack on
+    ensure_val_is_object_or_fail(connection, message, ret, val, "service object");
 
+#endif
     // check for function name:
     JS_GetProperty(dta->ctx, srv, method, &val);
     ensure_val_is_object_or_fail(connection, message, ret, val, "service method");
@@ -1025,7 +1042,7 @@ static void DBusDestructor(JSContext *ctx, JSObject *obj) {
             cbI++;
         }
 
-        map<string, objInfo*>::iterator obI = dta->expObjects.begin();
+        map<string, expInfo*>::iterator obI = dta->expObjects.begin();
         while (obI != dta->expObjects.end() ) {
             delete obI->second;
             obI++;
