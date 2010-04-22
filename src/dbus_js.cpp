@@ -248,7 +248,7 @@ static JSBool DBus_exportObject(JSContext *ctx, JSObject *obj, uintN argc, jsval
     key += "_";
     key += JS_GetStringBytes(iFace);
     
-    dbg_err3( "export object - keykey " << key );
+    dbg3_err( "export object - keykey " << key );
 
     expInfo* exi = new expInfo;
     exi->o = JSVAL_TO_OBJECT(argv[2]);
