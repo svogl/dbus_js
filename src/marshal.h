@@ -70,8 +70,11 @@ extern JSClass DBusError_jsClass; ///< js dbus error object
 		return JS_FALSE; \
 	}
 
+#define pass_only_if(assert, ...) check_args((assert), __VA_ARGS__)
+
+#define fail_if_not(assert, ...) check_args(assert, __VA_ARGS__)
+
 #define check_dbus_error(error) \
-    \
     if (dbus_error_is_set(&(error))) { \
         fprintf(stderr, "** DBUS ERROR **\n   Name: %s\n   Message: %s\n", \
                error.name, error.message); \
@@ -92,7 +95,7 @@ extern int indent;
 #define dbg2(x) if (DEBUG_LEVEL>=2) {ind();  x ; }
 #define dbg3(x) if (DEBUG_LEVEL>=3) {ind();  x ; }
 
-#define  dbg_err(x) if (DEBUG_LEVEL>=1) {ind();  cerr << __FUNCTION__ << ":" << __LINE__ << " " << x << endl; }
+#define dbg_err(x) if (DEBUG_LEVEL>=1) {ind();  cerr << __FUNCTION__ << ":" << __LINE__ << " " << x << endl; }
 #define dbg2_err(x) if (DEBUG_LEVEL>=2) {ind();  cerr << __FUNCTION__ << ":" << __LINE__ << " " << x << endl; }
 #define dbg3_err(x) if (DEBUG_LEVEL>=3) {ind();  cerr << __FUNCTION__ << ":" << __LINE__ << " " << x << endl; }
 

@@ -641,7 +641,8 @@ static DBusHandlerResult handleMethodCall(DBusConnection* connection, DBusMessag
 
     DBusArgsToJsvalArray(dta->ctx, message, &argc, &argv);
 
-    if (true) { // ALWAYS prepend opath:
+    if (true) {
+        // prepend opath:
         jsval* vals = new jsval[argc+1];
         JSString* sp = JS_NewStringCopyZ(dta->ctx, path);
         vals[0] = STRING_TO_JSVAL(sp);
