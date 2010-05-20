@@ -135,7 +135,6 @@ static gboolean glib_idle_func(gpointer p) {
     do {
         jsid id;
         jsval val;
-        fprintf(stderr, ",");
         ret = JS_NextProperty(data->cx, iter, &id);
         if (!ret || JSVAL_IS_VOID(val))
             break;
@@ -148,14 +147,13 @@ static gboolean glib_idle_func(gpointer p) {
         JSFunction* func = JS_ValueToFunction(data->cx, val);
         jsval argv;
         jsval rval;
+
         ret = JS_CallFunction(data->cx, data->glib, func, 0, &argv, &rval);
-        if (!ret) {
-        }
+
     } while (prop != JSVAL_VOID);
 
     JS_EndRequest(data->cx);
     // end transact
-    fprintf(stderr, ".");
     return true;
 }
 
