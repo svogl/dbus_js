@@ -12,9 +12,7 @@
 #include <jsapi.h>
 #include <jsfun.h>
 
-//#include <glib.h>
-#include <glib-2.0/glib/gmain.h>
-#include <glib-2.0/glib.h>
+#include <glib.h>
 
 #include "marshal.h"
 using namespace std;
@@ -83,7 +81,7 @@ static JSClass Glib_jsClass = {
 
 /* static funcs: */
 static JSBool Glib_s_mainloop(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
-    printf("object is in mainloop: %p\n", obj);
+    dbg3_err("object is in mainloop:\n" << hex << obj << dec);
 
     check_args((argc == 0), "must not pass an argument!\n");
     /*
@@ -96,7 +94,7 @@ static JSBool Glib_s_mainloop(JSContext *cx, JSObject *obj, uintN argc, jsval *a
 }
 
 static JSBool Glib_s_quit(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
-    printf("object is in mainloop: %p\n", obj);
+    dbg3_err("object is in mainloop: " << hex << obj << dec);
 
     check_args((argc == 0), "must not pass an argument!\n");
 
@@ -109,6 +107,7 @@ static gboolean glib_idle_func(gpointer p) {
     GlibData* data = (GlibData*) p;
     JSBool ret;
     if (!data) {
+        cout << "WHUA!!!\n\n\n\n";
         data = (GlibData*) glibData;
     }
     JS_BeginRequest(data->cx);
@@ -141,14 +140,14 @@ static gboolean glib_idle_func(gpointer p) {
         ret = JS_LookupPropertyById(data->cx, idleFuncs, id, &val);
         if (!ret)
             continue;
-        if (!JSVAL_IS_OBJECT(val) || !JS_ObjectIsFunction(data->cx, JSVAL_TO_OBJECT(val)))
+        if (!JSVAL_IS_OBJECT(val) )
             continue;
+        JSObject* handler = JSVAL_TO_OBJECT(val);
 
-        JSFunction* func = JS_ValueToFunction(data->cx, val);
         jsval argv;
         jsval rval;
 
-        ret = JS_CallFunction(data->cx, data->glib, func, 0, &argv, &rval);
+        ret = JS_CallFunctionName(data->cx, handler, "handle", 0, &argv, &rval);
 
     } while (prop != JSVAL_VOID);
 
@@ -158,7 +157,7 @@ static gboolean glib_idle_func(gpointer p) {
 }
 
 static JSBool Glib_s_idleEnable(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
-    printf("enable idle func cx=%o \n", cx);
+    dbg3_err("enable idle func cx=%p \n" << hex << cx << dec );
 
     pass_only_if((argc == 0), "must not pass an argument!\n");
 
@@ -166,7 +165,74 @@ static JSBool Glib_s_idleEnable(JSContext *cx, JSObject *obj, uintN argc, jsval 
     glibData->glib = obj;
     glibData->glibPtr = g_malloc(sizeof (GlibData*));
 
-    g_idle_add(glib_idle_func, 0);
+    GlibData* data = (GlibData*)glibData->glibPtr;
+    data->cx = cx;
+    data->glib = obj;
+
+    g_idle_add(glib_idle_func, glibData->glibPtr);
+
+    return JS_TRUE;
+}
+
+static JSBool Glib_s_idleDisable(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
+    dbg3_err("disable idle func");
+
+    pass_only_if((argc == 0), "must not pass an argument!\n");
+
+    g_idle_remove_by_data(glibData->glibPtr);
+    glibData->glibPtr = 0;
+    return JS_TRUE;
+}
+
+typedef struct _timeoutData {
+    JSContext* cx;
+    JSObject* handler;
+} TimeoutData;
+
+gboolean _glib_timout_func(gpointer ptr) {
+    // pointer to data; data to
+    JSBool ret;
+    if (!ptr) {
+        dbg_err("ptr is null!");
+        return false;
+    }
+    TimeoutData* tod = (TimeoutData*)ptr;
+    tod->cx;
+    jsval argv, rval;
+    JS_BeginRequest(tod->cx);
+    ret = JS_CallFunctionName(tod->cx, tod->handler, "handle", 0, &argv, &rval);
+    JS_EndRequest(tod->cx);
+    if (JSVAL_IS_BOOLEAN(rval)) {
+        JSBool cont = JSVAL_TO_BOOLEAN(rval);
+        if (!cont)
+            g_free(ptr); // not needed any more
+        return cont;
+    }
+    return false;
+}
+
+static JSBool Glib_s_addTimeout(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
+    dbg3_err("add timeout");
+
+    pass_only_if((argc == 2), "must not pass an argument!\n");
+    pass_only_if(JSVAL_IS_OBJECT(argv[0]), "arg[0] must be object!");
+    pass_only_if(JSVAL_IS_INT(argv[1]), "arg[1] must be an int (ms)!");
+
+    JSObject* handler = JSVAL_TO_OBJECT(argv[0]);
+    jsint interval = JSVAL_TO_INT(argv[1]);
+
+    // TODO: check for handle function....
+    if (interval <= 0) {
+        dbg_err("interval < 0");
+        return JS_FALSE;
+    }
+
+    gpointer ptr = g_malloc(sizeof (TimeoutData));
+    TimeoutData* tod = (TimeoutData*)ptr;
+    tod->cx = cx;
+    tod->handler = handler;
+
+    g_timeout_add(interval, _glib_timout_func, ptr);
 
     return JS_TRUE;
 }
@@ -175,6 +241,8 @@ static JSFunctionSpec _GlibStaticFunctionSpec[] = {
     { "mainloop", Glib_s_mainloop, 0, 0, 0},
     { "quit", Glib_s_quit, 0, 0, 0},
     { "enableIdleFuncs", Glib_s_idleEnable, 0, 0, 0},
+    { "disableIdleFuncs", Glib_s_idleDisable, 0, 0, 0},
+    { "addTimeout", Glib_s_addTimeout, 0, 0, 0},
     { 0, 0, 0, 0, 0}
 };
 
@@ -185,7 +253,7 @@ JSObject* GlibInit(JSContext *cx, JSObject *obj) {
     if (obj == NULL)
         obj = JS_GetGlobalObject(cx);
 
-    JS_InitClass(cx, obj, NULL,
+    JSObject* o = JS_InitClass(cx, obj, NULL,
             &Glib_jsClass,
             GlibConstructor, 0,
             NULL, // properties
@@ -207,6 +275,7 @@ JSObject* GlibInit(JSContext *cx, JSObject *obj) {
         fprintf(stderr, "Could not create GMainLoop!");
         exit(1);
     }
+    return o;
 }
 
 /*************************************************************************************************/

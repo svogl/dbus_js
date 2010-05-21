@@ -11,8 +11,21 @@ function fail_if_nempty() {
 			echo "ERROR: LOG ----------- "
 			cat ${OUT}
 		fi
-		rm ${OUT}
 		exit 1
 	fi
+}
+
+function pass_if_nempty() {
+	str=$1
+	if [ ! ".." == ".${str}." ] ; then 
+		echo "PASS : $TEST"
+		rm ${OUT} ${ERR}
+		exit 0
+	fi
+}
+
+
+function fail_always() {
+	fail_if_nempty "Failing unconditionally"
 }
 

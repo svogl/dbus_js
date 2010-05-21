@@ -23,10 +23,12 @@ function FunFun() {
 }
 
 Glib.idleFuncs = new Array();
-Glib.enableIdleFuncs();
+Glib.enableIdleFuncs(); // please: AFTER the idleFuncs init!
 
 Glib.idleFuncs[Glib.idleFuncs.length] = new Hello();
 Glib.idleFuncs[Glib.idleFuncs.length] = new FunFun();
+
+print("idles: " + Glib.idleFuncs);
 
 Glib.mainloop();
 

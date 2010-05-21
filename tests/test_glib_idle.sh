@@ -15,7 +15,7 @@ DOUT=/tmp/${TEST}.dbus
 sys_js test_glib_idlefunc.js >${OUT} 2>&1 &
 PID=$!
 #
-# sleep for 2 seconds - the process must have finished!
+# sleep for n seconds - the process must have finished!
 #
 sleep 1
 
@@ -29,13 +29,6 @@ ERRSTR=`grep -i Error ${OUT}`
 fail_if_nempty "$ERRSTR"
 
 ERRSTR=`grep -i Success ${OUT}`
-if [ ! ".." == ".${ERRSTR}." ] ; then 
-	echo "PASS : $TEST"
-	rm ${OUT} ${ERR}
-	exit 0
-fi
+pass_if_nempty "$ERRSTR"
 
-## clean up
-echo "ERROR: $TEST : ${ERRSTR}"
-exit 1
-
+fail_always
