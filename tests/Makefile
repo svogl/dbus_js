@@ -4,12 +4,14 @@
 #
 export PATH=$PATH:/opt/smarthome/bin/
 
-T=$(ls: test*)
+T=$(shell ls test*sh)
+
 all: tests
 
-
-tests:
-	echo "$(T)"
-	for i in $(sh: ls test*.sh); do \
-		test$i.sh ; \
+tests: $T
+	- for i in $T; do \
+		echo "=========== $$i ==============" ; \
+		./$$i ; \
 	done
+
+.PHONY: tests

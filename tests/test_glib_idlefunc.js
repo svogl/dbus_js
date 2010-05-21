@@ -5,24 +5,28 @@ DSO.load("dbus");
 
 i = 0;
 
-hello = function() {
-	print("hello");
+function Hello() {
+	this.handle = function() {
+		print("hello");
+	}
 }
 
-funfun = function() {
-	print("funfun");
-	i++;
-	if (i==10) {
-		print("Success!");
-		Glib.quit();
+function FunFun() {
+	this.handle = function() {
+		print("funfun");
+		i++;
+		if (i==10) {
+			print("Success!");
+			Glib.quit();
+		}
 	}
 }
 
 Glib.idleFuncs = new Array();
 Glib.enableIdleFuncs();
 
-Glib.idleFuncs[Glib.idleFuncs.length] = hello;
-Glib.idleFuncs[Glib.idleFuncs.length] = funfun;
+Glib.idleFuncs[Glib.idleFuncs.length] = new Hello();
+Glib.idleFuncs[Glib.idleFuncs.length] = new FunFun();
 
 Glib.mainloop();
 
