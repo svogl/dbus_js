@@ -81,7 +81,6 @@ static JSClass Glib_jsClass = {
 
 /* static funcs: */
 static JSBool Glib_s_mainloop(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
-    dbg3_err("object is in mainloop:\n" << hex << obj << dec);
 
     check_args((argc == 0), "must not pass an argument!\n");
     /*
@@ -94,7 +93,6 @@ static JSBool Glib_s_mainloop(JSContext *cx, JSObject *obj, uintN argc, jsval *a
 }
 
 static JSBool Glib_s_quit(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
-    dbg3_err("object is in mainloop: " << hex << obj << dec);
 
     check_args((argc == 0), "must not pass an argument!\n");
 
@@ -107,7 +105,6 @@ static gboolean glib_idle_func(gpointer p) {
     GlibData* data = (GlibData*) p;
     JSBool ret;
     if (!data) {
-        cout << "WHUA!!!\n\n\n\n";
         data = (GlibData*) glibData;
     }
     JS_BeginRequest(data->cx);
@@ -157,7 +154,6 @@ static gboolean glib_idle_func(gpointer p) {
 }
 
 static JSBool Glib_s_idleEnable(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
-    dbg3_err("enable idle func cx=%p \n" << hex << cx << dec );
 
     pass_only_if((argc == 0), "must not pass an argument!\n");
 
@@ -175,7 +171,6 @@ static JSBool Glib_s_idleEnable(JSContext *cx, JSObject *obj, uintN argc, jsval 
 }
 
 static JSBool Glib_s_idleDisable(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
-    dbg3_err("disable idle func");
 
     pass_only_if((argc == 0), "must not pass an argument!\n");
 
@@ -190,7 +185,6 @@ typedef struct _timeoutData {
 } TimeoutData;
 
 gboolean _glib_timout_func(gpointer ptr) {
-    // pointer to data; data to
     JSBool ret;
     if (!ptr) {
         dbg_err("ptr is null!");
