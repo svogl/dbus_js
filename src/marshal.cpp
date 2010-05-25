@@ -676,6 +676,22 @@ JSBool DBusMarshalling::unMarshallIter(JSContext *ctx, int current_type, DBusMes
                 indent--;
                 break;
             }
+            case DBUS_TYPE_VARIANT:
+            {
+                DBusMessageIter var;
+
+                dbus_message_iter_recurse (iter, &var);
+                char* sig = dbus_message_iter_get_signature (&var);
+                int var_type = dbus_message_iter_get_arg_type(&var);
+                if (!ret ) {
+                    dbg_err("error opening iterator!");
+                    return ret;
+                }
+                indent++;
+                ret = unMarshallIter(ctx,var_type,&var, val);
+                indent--;
+                break;
+            }
             default:
             {
                 cerr << "unknown container type " << (char) current_type << "\n";
@@ -683,7 +699,7 @@ JSBool DBusMarshalling::unMarshallIter(JSContext *ctx, int current_type, DBusMes
             }
         }
     } else {
-        cerr << "what's this??? " << dbus_message_iter_get_signature(iter) << endl;
+        dbg_err(  "Can't deal with signature " << dbus_message_iter_get_signature(iter) );
         ret = JS_FALSE;
     }
     return ret;
