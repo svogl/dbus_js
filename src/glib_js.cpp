@@ -191,7 +191,7 @@ gboolean _glib_timout_func(gpointer ptr) {
         return false;
     }
     TimeoutData* tod = (TimeoutData*)ptr;
-    tod->cx;
+
     jsval argv, rval;
     JS_BeginRequest(tod->cx);
     ret = JS_CallFunctionName(tod->cx, tod->handler, "handle", 0, &argv, &rval);

@@ -146,6 +146,31 @@ JSBool DBusMarshalling::marshallVariant(JSContext *cx, JSObject *obj, /*DBusMess
                 } else if (isDictObject(cx, ov)) {
                     dbg2_err("...dudu!");
                     ret = marshallDictObject(cx, ov, iter);
+                } else if (isTypeCastObject(cx, ov)) {
+                    dbg2_err("type cast found!");
+                    JSObject* ov = JSVAL_TO_OBJECT(*val);
+                    jsval typeval;
+                    jsval valval;
+                    ret = JS_GetProperty(cx, ov, "type", &typeval);
+                    ret = JS_GetProperty(cx, ov, "value", &valval);
+                    if (! JSVAL_IS_STRING(typeval)) {
+                        dbg_err("'type' must be a string!");
+                        return JS_FALSE;
+                    }
+                    char*typstr = JS_GetStringBytes(JSVAL_TO_STRING(typeval));
+                    if (strcmp("UInt32", typstr) == 0) {
+                        jsint iv = JSVAL_TO_INT(valval);
+                        unsigned int value = iv;
+                        dbg3_err("setting uint32:" << value);
+                        ret = dbus_message_iter_append_basic(iter,
+                                DBUS_TYPE_UINT32,
+                                &value);
+                        return JS_TRUE;
+                    } else if (strcmp("UInt64", typstr) == 0) {
+                    } else {
+                        dbg_err("unknown type cast " << typstr);
+                        return JS_FALSE;
+                    }
                     /*
                 } else if (OBJECT_IS_XML(cx,ov)) {
                     JSClass* cls = JS_GET_CLASS(cx, ov);
@@ -678,17 +703,13 @@ JSBool DBusMarshalling::unMarshallIter(JSContext *ctx, int current_type, DBusMes
             }
             case DBUS_TYPE_VARIANT:
             {
-                DBusMessageIter var;
+                DBusMessageIter subiter;
 
-                dbus_message_iter_recurse (iter, &var);
-                char* sig = dbus_message_iter_get_signature (&var);
-                int var_type = dbus_message_iter_get_arg_type(&var);
-                if (!ret ) {
-                    dbg_err("error opening iterator!");
-                    return ret;
-                }
+                dbus_message_iter_recurse (iter, &subiter);
+                char* sig = dbus_message_iter_get_signature (&subiter);
+                int var_type = dbus_message_iter_get_arg_type(&subiter);
                 indent++;
-                ret = unMarshallIter(ctx,var_type,&var, val);
+                ret = unMarshallIter(ctx,var_type,&subiter, val);
                 indent--;
                 break;
             }

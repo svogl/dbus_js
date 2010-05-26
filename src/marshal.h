@@ -62,6 +62,7 @@ private:
  */
 extern JSClass DBusResult_jsClass; ///< js dbus result object
 extern JSClass DBusError_jsClass; ///< js dbus error object
+extern JSClass DBusTypeCast_jsClass; ///< js dbus typecast object
 
 /************** helpers */
 #define check_args(assert, ...) if (!(assert)) { \
@@ -116,6 +117,17 @@ extern JSClass DBusDict_jsClass;
 extern JSClass DBusResult_jsClass;
 #include <iostream>
 using namespace std;
+
+static inline bool isTypeCastObject(JSContext* ctx, JSObject* obj) {
+    JSClass* cls =  JS_GetClass(ctx, obj);
+//	cerr << hex << " isDict? cls= " << cls << " against " << &DBusDict_jsClass << dec << endl;
+	return (cls == &DBusTypeCast_jsClass);
+}
+
+static inline bool jsvalIsTypeCastObject(JSContext* ctx, jsval propkey) {
+	JSObject* obj = JSVAL_TO_OBJECT(propkey);
+	return isTypeCastObject(ctx, obj);
+}
 
 static inline bool isDictObject(JSContext* ctx, JSObject* obj) { 
     JSClass* cls =  JS_GetClass(ctx, obj);

@@ -1103,6 +1103,16 @@ JSClass DBusDict_jsClass = {
     0, 0, 0, 0
 };
 
+JSClass DBusTypeCast_jsClass = {
+    "DBusTypeCast", 0,
+    JS_PropertyStub, JS_PropertyStub, // add/del prop
+    JS_PropertyStub, JS_PropertyStub, // get/set prop
+    JS_EnumerateStub, JS_ResolveStub, // enum / resolve
+    JS_ConvertStub, 0, // convert / finalize
+    0, 0, 0, 0,
+    0, 0, 0, 0
+};
+
 JSClass DBusResult_jsClass = {
     "DBusResult", 0,
     JS_PropertyStub, JS_PropertyStub, // add/del prop
@@ -1223,6 +1233,11 @@ JSObject* DBusInit(JSContext *ctx, JSObject *obj) {
     // result object
     JS_InitClass(ctx, obj, NULL,
             &DBusDict_jsClass,
+            DBusObjConstructor, 0, NULL, // properties
+            0, NULL, 0);
+    //typecast helper object
+    JS_InitClass(ctx, obj, NULL,
+            &DBusTypeCast_jsClass,
             DBusObjConstructor, 0, NULL, // properties
             0, NULL, 0);
     // result object
