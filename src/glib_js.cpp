@@ -272,4 +272,17 @@ JSObject* GlibInit(JSContext *cx, JSObject *obj) {
     return o;
 }
 
+JSBool GlibExit(JSContext *ctx)
+{
+    g_main_loop_quit(mainloop);
+    g_main_destroy(mainloop);
+    mainloop=0;
+    if (glibData) {
+        delete glibData;
+        glibData=0;
+    }
+
+    return JS_TRUE;
+}
+
 /*************************************************************************************************/

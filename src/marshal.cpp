@@ -666,8 +666,8 @@ JSBool DBusMarshalling::getVariantArray(JSContext *ctx, DBusMessageIter *iter, i
 
     while ((current_type = dbus_message_iter_get_arg_type(iter))
             != DBUS_TYPE_INVALID && ret == JS_TRUE) {
-        dbg3(cerr << "gVA " << len << " " << current_type << "  sig = ");
-        dbg3(cerr << dbus_message_iter_get_signature(iter) << endl);
+        //dbg3(cerr << "gVA " << len << " " << current_type << "  sig = ");
+        //dbg3_err( dbus_message_iter_get_signature(iter) ); /// XXX need to free signature..
         ret = unMarshallIter(ctx, current_type, iter, &vector[len]);
         dbus_message_iter_next(iter);
         len++;
@@ -764,8 +764,8 @@ JSBool DBusMarshalling::unMarshallBasic(JSContext *ctx, int type, DBusMessageIte
         {
             jsint val;
             dbus_message_iter_get_basic(iter, &val);
+            dbg2_err("int32 [" << val << "]");
             *value = INT_TO_JSVAL(val);
-            dbg2_err("int32 [" << *value << "]");
             //variant->SetAsInt32(val);
             break;
         }

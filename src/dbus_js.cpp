@@ -247,8 +247,8 @@ static JSBool DBus_exportObject(JSContext *ctx, JSObject *obj, uintN argc, jsval
     key = JS_GetStringBytes(oPath);
     key += "_";
     key += JS_GetStringBytes(iFace);
-    
-    dbg3_err( "export object - keykey " << key );
+
+    dbg3_err("export object - keykey " << key);
 
     expInfo* exi = new expInfo;
     exi->o = JSVAL_TO_OBJECT(argv[2]);
@@ -396,7 +396,7 @@ static JSBool DBus_callMethod(JSContext *ctx, JSObject *obj, uintN argc, jsval *
             cerr << "TODO: create array object of return values!" << endl;
         }
     }
-    delete vector;
+    delete[] vector;
 
     return JS_TRUE;
 }
@@ -510,7 +510,10 @@ static void printer(DBusMessageIter* iter) {
 }
 #endif
 
-JSBool DBusArgsToJsvalArray(JSContext *ctx, DBusMessage* message, int* len, jsval** vals) {
+/** DBusArgsToJsvalArray converts the dbus message arguments to a jsval array. it returns the number
+ * of arguments in len.
+ */
+static JSBool DBusArgsToJsvalArray(JSContext *ctx, DBusMessage* message, int* len, jsval** vals) {
     DBusMessageIter iter;
     int length = 0;
     jsval* vector;
@@ -529,6 +532,32 @@ JSBool DBusArgsToJsvalArray(JSContext *ctx, DBusMessage* message, int* len, jsva
     dbg3_err("length after unmarsh = " << length << endl);
 
     *len = length;
+    *vals = vector;
+    return JS_TRUE;
+}
+/** DBusArgsToJsvalArrayPreprend acts as DBusArgsToJsvalArray, but saves the first slot for
+ * method call meta-data. vector[0] can be filled by handleMethodcall with opath or at a later
+ * time with a dbusmesssage object.
+ */
+static JSBool DBusArgsToJsvalArrayPreprend(JSContext *ctx, DBusMessage* message, int* len, jsval** vals) {
+    DBusMessageIter iter;
+    int length = 0;
+    jsval* vector;
+
+    dbus_message_iter_init(message, &iter);
+    while (dbus_message_iter_next(&iter)) {
+        length++;
+    }
+    dbg3_err("length = " << length << endl);
+
+    vector = new jsval[length+1];
+
+    dbus_message_iter_init(message, &iter);
+
+    DBusMarshalling::getVariantArray(ctx, &iter, &length, vector+1);
+    dbg3_err("length after unmarsh = " << length << endl);
+
+    *len = length+1;
     *vals = vector;
     return JS_TRUE;
 }
@@ -588,7 +617,7 @@ static DBusHandlerResult handleMethodCall(DBusConnection* connection, DBusMessag
     key += "_";
     key += dbus_message_get_interface(message);
 
-    cerr << "*** bus obj " << hex<< bus << dec << endl;
+    cerr << "*** bus obj " << hex << bus << dec << endl;
     cerr << "*** looking for key " << key << endl;
 
     ret = JS_GetProperty(dta->ctx, bus, "keys", &val);
@@ -605,20 +634,20 @@ static DBusHandlerResult handleMethodCall(DBusConnection* connection, DBusMessag
     JSObject* srv = JSVAL_TO_OBJECT(val);
 #else
     map<string, expInfo*>::iterator info = dta->expObjects.find(key);
-    JSObject* srv=NULL;
-    if(info != dta->expObjects.end() ) {
+    JSObject* srv = NULL;
+    if (info != dta->expObjects.end()) {
         srv = info->second->o;
         cerr << "found service entry at " << key << " o " << hex << srv << dec << endl;
     } else {
         cerr << "no service match for " << key << endl;
         info = dta->expObjects.begin();
-        while (info != dta->expObjects.end() ) {
+        while (info != dta->expObjects.end()) {
             cerr << " exi " << info->first << endl;
             info++;
         }
     }
     ret = JS_TRUE;
-    val=OBJECT_TO_JSVAL(srv); // hack on
+    val = OBJECT_TO_JSVAL(srv); // hack on
     ensure_val_is_object_or_fail(connection, message, ret, val, "service object");
 
 #endif
@@ -639,17 +668,9 @@ static DBusHandlerResult handleMethodCall(DBusConnection* connection, DBusMessag
     JSObject* methArg;
     jsval* argv;
 
-    DBusArgsToJsvalArray(dta->ctx, message, &argc, &argv);
-
-    if (true) { // ALWAYS prepend opath:
-        jsval* vals = new jsval[argc+1];
-        JSString* sp = JS_NewStringCopyZ(dta->ctx, path);
-        vals[0] = STRING_TO_JSVAL(sp);
-        memcpy(vals+1,argv,sizeof(jsval)*argc);
-        delete argv;
-        argv=vals;
-        argc++;
-    }
+    DBusArgsToJsvalArrayPreprend(dta->ctx, message, &argc, &argv);
+    JSString* sp = JS_NewStringCopyZ(dta->ctx, path);
+    argv[0] = STRING_TO_JSVAL(sp);
 
     dbus_uint32_t serial = 0;
 
@@ -1031,27 +1052,32 @@ static void DBusDestructor(JSContext *ctx, JSObject *obj) {
     cerr << "delete DBus obj " << hex << dta << dec << endl;
     if (dta) {
         free(dta->name);
-        delete (dta);
 
-        dbus_connection_unref(dta->connection);
-
+        dbus_connection_remove_filter(dta->connection,
+                filter_func, dta);
+        if (dta->connection) {
+            dbus_connection_unref(dta->connection);
+            dta->connection = 0;
+        }
+        
         map<string, callbackInfo*>::iterator cbI = dta->sigHandlers.begin();
-        while (cbI != dta->sigHandlers.end() ) {
+        while (cbI != dta->sigHandlers.end()) {
             delete cbI->second;
             cbI++;
         }
 
         map<string, expInfo*>::iterator obI = dta->expObjects.begin();
-        while (obI != dta->expObjects.end() ) {
+        while (obI != dta->expObjects.end()) {
             delete obI->second;
             obI++;
         }
 
         map<string, void*>::iterator bnI = dta->busNames.begin();
-        while (bnI != dta->busNames.end() ) {
+        while (bnI != dta->busNames.end()) {
             //delete bnI->second;
             bnI++;
         }
+        delete (dta);
     }
 }
 
@@ -1255,13 +1281,17 @@ JSObject* DBusInit(JSContext *ctx, JSObject *obj) {
 
 }
 
+JSBool DBusExit(JSContext *ctx) {
+    return JS_TRUE;
+}
+
 /*************************************************************************************************/
 extern JSObject* GlibInit(JSContext *ctx, JSObject *obj);
+extern int GlibExit(JSContext *ctx);
 
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
-
     int js_DSO_load(JSContext *context) {
         if (!DBusInit(context, NULL)) {
             fprintf(stderr, "Cannot init DBus class\n");
@@ -1276,7 +1306,20 @@ extern "C" {
         return JS_TRUE;
     }
 
+    int js_DSO_unload(JSContext *context) {
+        if (!DBusExit(context)) {
+            fprintf(stderr, "Cannot finalize DBus\n");
+            return EXIT_FAILURE;
+        }
+
+        if (!GlibExit(context)) {
+            fprintf(stderr, "Cannot finalize Glib\n");
+            return EXIT_FAILURE;
+        }
+
+        return JS_TRUE;
+    }
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
-
