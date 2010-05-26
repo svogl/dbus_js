@@ -15,6 +15,23 @@ function fail_if_nempty() {
 	fi
 }
 
+function fail_if_not_zero() {
+	val=$1
+	### optional: pass file to dump instead of OUT
+	if [ $# == 2 ] ; then
+		OUT=$2
+	fi;
+	#echo "CHECK: $str"
+	if [ "0" != "${val}" ] ; then 
+		echo "ERROR: $TEST"
+		if [ ! -z "$VERBOSE" ] ; then 
+			echo "ERROR: LOG ----------- "
+			cat ${OUT}
+		fi
+		exit 1
+	fi
+}
+
 function pass_if_nempty() {
 	str=$1
 	if [ ! ".." == ".${str}." ] ; then 
