@@ -54,6 +54,12 @@ private:
     static const int getDataTypeAsDBusType(PRUint16);
     static const char *getDBusTypeAsSignature(int);
      */
+
+    /* get the type signature of a dict value entry.
+     * @param dictObj a JSObject of type DbusDict (or at least with the properties key, value [,type_cast] )
+     * @param sigBuf a user-supplied buffer for the signature. make sure it is big enough(!)
+     */
+    static JSBool getDictValTypeSig(JSContext *ctx, JSObject* dictObj, char* sigBuf);
 };
 
 

@@ -24,7 +24,7 @@ DBusMarshalling::appendArgs(JSContext *cx, JSObject *obj,
     return JS_TRUE;
 }
 
-JSBool DBusMarshalling::marshallBasicValue(JSContext *cx, JSObject *obj, /*DBusMessage *message,*/ DBusMessageIter *iter, jsval * val) {
+JSBool DBusMarshalling::marshallBasicValue(JSContext *cx, JSObject *obj, DBusMessageIter *iter, jsval * val) {
     dbus_int32_t ret;
     if (val == NULL) {
         fprintf(stderr, "NULL value detected - skipping!\n");
@@ -254,10 +254,8 @@ DBusMarshalling::marshallJSArray(JSContext* cx,
                 DBUS_TYPE_ARRAY_AS_STRING
                 DBUS_DICT_ENTRY_BEGIN_CHAR_AS_STRING
                 DBUS_TYPE_STRING_AS_STRING
-                DBUS_TYPE_STRING_AS_STRING
-                //DBUS_TYPE_VARIANT_AS_STRING
+                DBUS_TYPE_VARIANT_AS_STRING
                 DBUS_DICT_ENTRY_END_CHAR_AS_STRING
-
                 , &container_iter));
     } else {
         // generic variant array
@@ -287,6 +285,114 @@ DBusMarshalling::marshallJSArray(JSContext* cx,
     return JS_TRUE;
 }
 
+
+
+JSBool DBusMarshalling::getDictValTypeSig(JSContext* cx, JSObject* dictObj, char* sig) {
+    dbus_int32_t ret;
+    jsval val;
+    jsval cast;
+    JS_GetProperty(cx, dictObj,"value",&val);
+
+    JS_GetProperty(cx, dictObj,"type",&cast);
+    if (JSVAL_IS_STRING(cast) ) {
+        return JS_TRUE;
+    }
+
+    int tag = JSVAL_TAG(val);
+    if (JSVAL_IS_INT(val)) {
+        jsint iv = JSVAL_TO_INT(val);
+        sig[0] = DBUS_TYPE_INT32 ;
+    } else if (JSVAL_IS_STRING(val)) {
+        JSString* sv = JSVAL_TO_STRING(val);
+        sig[0] =  DBUS_TYPE_STRING;
+    } else if (JSVAL_IS_BOOLEAN(val)) {
+        sig[0] = DBUS_TYPE_BOOLEAN;
+    } else if (JSVAL_IS_DOUBLE(val)) {
+        sig[0] = DBUS_TYPE_DOUBLE;
+    } else
+        switch (tag) {
+            case JSVAL_OBJECT:
+            {
+                // parse object....
+                if (JSVAL_IS_OBJECT(val))
+                    dbg2_err("its an object!");
+
+                //JSObject* ov = JSVAL_TO_OBJECT(*val);
+
+                dbg_err("...uuuund? was machma damit??? a object im basic. sollma den source marshallen? ");
+            }
+                break;
+            default:
+                fprintf(stderr, "illegal type (tag=%d) !\n", tag);
+                if (JSVAL_IS_NUMBER(val))
+                    fprintf(stderr, "its a number !\n");
+                if (JSVAL_IS_DOUBLE(val))
+                    fprintf(stderr, "its a double !\n");
+                if (JSVAL_IS_INT(val))
+                    fprintf(stderr, "its a int !\n");
+                if (JSVAL_IS_OBJECT(val))
+                    fprintf(stderr, "its a object !\n");
+                if (JSVAL_IS_STRING(val))
+                    fprintf(stderr, "its a string !\n");
+                if (JSVAL_IS_BOOLEAN(val))
+                    fprintf(stderr, "its a bool !\n");
+                if (JSVAL_IS_NULL(val))
+                    fprintf(stderr, "its a null !\n");
+                if (JSVAL_IS_VOID(val))
+                    fprintf(stderr, "its a void !\n");
+                //ret = JS_FALSE;
+        }
+    return JS_TRUE;
+}
+
+JSBool
+DBusMarshalling::marshallDictObject(JSContext* ctx,
+        JSObject* dictObj,
+        DBusMessageIter* iter) {
+    DBusMessageIter dict_iter, variant;
+    int rv;
+    JSBool ret;
+    dbg2_err("marsh DICT OBJECT");
+
+    JSIdArray* values = JS_Enumerate(ctx, dictObj);
+    dbg3_err("marshalling dict l=" << values->length);
+    if (values->length<2) {
+        dbg_err("not enough elements found! l=" << values->length);
+    }
+
+    cerr << "iter sig " << dbus_message_iter_get_signature(iter) << endl;
+    enforce_notnull(
+            dbus_message_iter_open_container(iter, DBUS_TYPE_DICT_ENTRY,
+            //DBUS_DICT_ENTRY_BEGIN_CHAR_AS_STRING
+            DBUS_TYPE_STRING_AS_STRING
+            DBUS_TYPE_VARIANT_AS_STRING
+            //DBUS_DICT_ENTRY_END_CHAR_AS_STRING
+            , &dict_iter));
+    cerr << "  dict_iter sig " << dbus_message_iter_get_signature(&dict_iter) << endl;
+
+    jsval propkey = 0;
+    jsval propval = 0;
+
+    ret = JS_GetProperty(ctx, dictObj, "key", &propkey);
+    ret = JS_GetProperty(ctx, dictObj, "value", &propkey);
+
+    char*keystr = JS_GetStringBytes(JSVAL_TO_STRING(propkey));
+    dbus_message_iter_append_basic(&dict_iter, DBUS_TYPE_STRING, &keystr);
+
+    char sig[8] = {0,0,0,0,0,0,0,0};
+    getDictValTypeSig(ctx, dictObj, sig);
+    dbus_message_iter_open_container(&dict_iter, DBUS_TYPE_VARIANT, sig, &variant);
+    marshallBasicValue(ctx, dictObj, &variant, &propval);
+
+    cerr << "  container_iter sig " << dbus_message_iter_get_signature(&dict_iter) << endl;
+    printf("marshalled dict object\n");
+    return JS_TRUE;
+}
+
+
+
+
+#if 0
 JSBool
 DBusMarshalling::marshallDictObject(JSContext* cx,
         JSObject* dictObj,
@@ -374,6 +480,11 @@ DBusMarshalling::marshallDictObject(JSContext* cx,
     printf("marshalled dict object\n");
     return JS_TRUE;
 }
+
+
+
+#endif
+
 
 JSBool
 DBusMarshalling::marshallJSObject(JSContext* cx,
@@ -683,27 +794,31 @@ JSBool DBusMarshalling::unMarshallIter(JSContext *ctx, int current_type, DBusMes
         dbg3(cerr << "basic type.. ");
         ret = unMarshallBasic(ctx, current_type, iter, val);
     } else if (dbus_type_is_container(current_type)) {
-        cerr << "container type.. ";
+        dbg3_err("container type.. " << dbus_message_iter_get_signature(iter) );
+        indent++;
         switch (current_type) {
             case DBUS_TYPE_ARRAY:
             {
-                dbg3(cerr << "array");
+                dbg3_err("array");
                 indent++;
                 ret = unMarshallArray(ctx, current_type, iter, val);
                 indent--;
+                dbg3_err("array done " << hex << *val << dec);
                 break;
             }
             case DBUS_TYPE_DICT_ENTRY:
             {
-                dbg3(cerr << "dict.. "); //@TODO implement dict type
+                dbg3_err("dict.. " << dbus_message_iter_get_signature(iter) ); //@TODO implement dict type
                 indent++;
                 ret = unMarshallDict(ctx, current_type, iter, val);
                 indent--;
+                dbg3_err("dict done " << hex << *val << dec);
                 break;
             }
             case DBUS_TYPE_VARIANT:
             {
                 DBusMessageIter subiter;
+                dbg_err("variant ");
 
                 dbus_message_iter_recurse (iter, &subiter);
                 char* sig = dbus_message_iter_get_signature (&subiter);
@@ -715,9 +830,10 @@ JSBool DBusMarshalling::unMarshallIter(JSContext *ctx, int current_type, DBusMes
             }
             default:
             {
-                cerr << "unknown container type " << (char) current_type << "\n";
+                dbg_err("unknown container type " << (char) current_type);
                 ret = JS_FALSE;
             }
+            indent--;
         }
     } else {
         dbg_err(  "Can't deal with signature " << dbus_message_iter_get_signature(iter) );
@@ -858,31 +974,23 @@ DBusMarshalling::unMarshallArray(JSContext *ctx, int type, DBusMessageIter *iter
 
 JSBool
 DBusMarshalling::unMarshallDict(JSContext *ctx, int type, DBusMessageIter *iter, jsval* val) {
-    JSBool ret;
+    JSBool ret = JS_TRUE;
     DBusMessageIter subiter;
     int length = 0;
     int current_type;
-    jsval* vector;
-    dbg3(cerr << "dict entry" << endl);
-    dbus_message_iter_recurse(iter, &subiter);
-    while (dbus_message_iter_next(&subiter)) {
-        length++;
-    }
-    vector = new jsval[length]; //TODO: memleak?
-
-    dbg3(cerr << "unMarsch len = " << length << endl);
+    dbg3_err("dict entry");
 
     JSObject *dict = JS_NewObject(ctx,
-            &DBusResult_jsClass,
-            //JS_GetClass(JS_GetGlobalObject(ctx)),
+            &DBusDict_jsClass,
             NULL, NULL);
 
     dbus_message_iter_recurse(iter, &subiter);
-    while ((current_type = dbus_message_iter_get_arg_type(iter))
+    dbg3_err("recurse again"  );
+    while ((current_type = dbus_message_iter_get_arg_type(&subiter))
             != DBUS_TYPE_INVALID && ret == JS_TRUE) {
+        dbg3_err("get entry" );
         jsval val;
         // first come the key - must be a basic type. ATM we recognize strings only.
-        dbg3(cerr << "--- name " << endl);
         char *name;
         if (current_type != DBUS_TYPE_STRING) {
             cerr << "Whaaaa! Don't know about non-string keys! skip!" << endl;
@@ -892,21 +1000,28 @@ DBusMarshalling::unMarshallDict(JSContext *ctx, int type, DBusMessageIter *iter,
             continue;
         }
         dbus_message_iter_get_basic(&subiter, &name);
+        dbg3_err( "--- name " << name);
 
-        dbg3(cerr << "--- value " << endl);
         dbus_message_iter_next(&subiter);
-        current_type = dbus_message_iter_get_arg_type(iter);
+        current_type = dbus_message_iter_get_arg_type(&subiter);
 
         ret = unMarshallIter(ctx, current_type, &subiter, &val);
+        dbg3_err("--- value " << hex << val << dec );
+        dbg3_err("--- value is string? " << JSVAL_IS_STRING(val) );
 
         JS_SetProperty(ctx, dict, name, &val);
+        {
+            jsval key = STRING_TO_JSVAL( JS_NewStringCopyZ(ctx, name) );
+            JS_SetProperty(ctx, dict, "key", &key);
+        }
+        JS_SetProperty(ctx, dict, "value", &val);
 
         dbus_message_iter_next(&subiter);
-        current_type = dbus_message_iter_get_arg_type(iter);
+        current_type = dbus_message_iter_get_arg_type(&subiter);
     }
+    dbg3_err("recurse done"  );
 
     *val = OBJECT_TO_JSVAL(dict);
-
 
     return JS_TRUE;
 }

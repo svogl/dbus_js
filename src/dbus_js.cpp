@@ -1081,6 +1081,30 @@ static void DBusDestructor(JSContext *ctx, JSObject *obj) {
     }
 }
 
+static JSBool DBusDictConstructor(JSContext *ctx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
+    if (!argc) {
+        return JS_TRUE;
+    }
+    if (argc==2 || argc == 3) {
+        // set a key/value pair
+        fail_if_not(JSVAL_IS_STRING(argv[0]), "key must be a string");
+        if (argc==3)
+            fail_if_not(JSVAL_IS_STRING(argv[2]), "typecast must be a string");
+
+        JS_SetProperty(ctx,obj,"key", &argv[0]);
+        JS_SetProperty(ctx,obj,"value", &argv[1]);
+
+        if (argc==3) {
+            jsval typeval;
+            JS_SetProperty(ctx,obj,"typecast", &argv[2]);
+        }
+        return JS_TRUE;
+    }
+    dbg_err("construct a dbus dict either empty or with a key/value pair (plus optional typecast for value)!");
+    return JS_FALSE;
+}
+
+
 static JSBool DBusObjConstructor(JSContext *ctx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
     return JS_TRUE;
 }
@@ -1259,7 +1283,7 @@ JSObject* DBusInit(JSContext *ctx, JSObject *obj) {
     // result object
     JS_InitClass(ctx, obj, NULL,
             &DBusDict_jsClass,
-            DBusObjConstructor, 0, NULL, // properties
+            DBusDictConstructor, 0, NULL, // properties
             0, NULL, 0);
     //typecast helper object
     JS_InitClass(ctx, obj, NULL,
