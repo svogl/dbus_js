@@ -102,9 +102,9 @@ extern int indent;
 #define dbg2(x) if (DEBUG_LEVEL>=2) {ind();  x ; }
 #define dbg3(x) if (DEBUG_LEVEL>=3) {ind();  x ; }
 
-#define dbg_err(x) if (DEBUG_LEVEL>=1) {ind();  cerr << __FUNCTION__ << ":" << __LINE__ << " " << x << endl; }
-#define dbg2_err(x) if (DEBUG_LEVEL>=2) {ind();  cerr << __FUNCTION__ << ":" << __LINE__ << " " << x << endl; }
-#define dbg3_err(x) if (DEBUG_LEVEL>=3) {ind();  cerr << __FUNCTION__ << ":" << __LINE__ << " " << x << endl; }
+#define dbg_err(x)  if (DEBUG_LEVEL>=1) {cerr << "|   "; ind();  cerr << __FUNCTION__ << ":" << __LINE__ << " " << x << endl; }
+#define dbg2_err(x) if (DEBUG_LEVEL>=2) {cerr << "||  "; ind();  cerr << __FUNCTION__ << ":" << __LINE__ << " " << x << endl; }
+#define dbg3_err(x) if (DEBUG_LEVEL>=3) {cerr << "||| "; ind();  cerr << __FUNCTION__ << ":" << __LINE__ << " " << x << endl; }
 
 /** walk over all elements to count the number of elements.
  * Side-effects: you have to re-init the iterator after calling this function!

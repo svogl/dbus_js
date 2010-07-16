@@ -950,14 +950,17 @@ DBusMarshalling::unMarshallArray(JSContext *ctx, int type, DBusMessageIter *iter
     dbus_message_iter_recurse(iter, &subiter);
     length = dbus_iter_length(&subiter);
     dbus_message_iter_recurse(iter, &subiter);
-
+    
+    char* sig = dbus_message_iter_get_signature(&subiter);
     dbg3_err("unMarsh len1 = " << length <<
-            " sig = " << dbus_message_iter_get_signature(&subiter));
+            " sig = " << sig);
+    if (strcmp("{ss}", sig) == 0 || strcmp("{sv}", sig) == 0)
+        dbg3_err("TODO: handle Dict intelligently... ");
+    dbus_free(sig);
 
     if (length == 0) {
         //empty array
     }
-
     vector = new jsval[length]; //TODO: memleak?
 
     ret = getVariantArray(ctx, &subiter, &length, vector);

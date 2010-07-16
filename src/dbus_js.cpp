@@ -164,7 +164,7 @@ static JSBool DBus_addSigHandler(JSContext *ctx, JSObject *obj, uintN argc, jsva
         matchRule += JS_GetStringBytes(oPath);
         matchRule += "'";
 
-        dbg2(cerr << "ADD MATCH: " << matchRule << "\n");
+        dbg2_err("ADD MATCH: " << matchRule );
 
         key = JS_GetStringBytes(oPath);
         key += "/";
@@ -345,10 +345,10 @@ static JSBool DBus_callMethod(JSContext *ctx, JSObject *obj, uintN argc, jsval *
 
     dbus_error_init(&dbus_error);
 
-    dbg2(cerr << "sName " << JS_GetStringBytes(sName) << endl);
-    dbg2(cerr << "opath " << JS_GetStringBytes(oPath) << endl);
-    dbg2(cerr << "iface " << JS_GetStringBytes(iFace) << endl);
-    dbg2(cerr << "member " << JS_GetStringBytes(method) << endl);
+    dbg2_err( "sName " << JS_GetStringBytes(sName) );
+    dbg2_err( "opath " << JS_GetStringBytes(oPath) );
+    dbg2_err( "iface " << JS_GetStringBytes(iFace) );
+    dbg2_err( "member " << JS_GetStringBytes(method) );
 
     message = dbus_message_new_method_call(
             JS_GetStringBytes(sName),
@@ -373,7 +373,7 @@ static JSBool DBus_callMethod(JSContext *ctx, JSObject *obj, uintN argc, jsval *
     check_dbus_error(dbus_error);
 
     const char* sig = dbus_message_get_signature(reply);
-    dbg2(cerr << "reply sig::: " << sig << endl);
+    dbg2_err("reply sig::: " << sig );
 
     int length = 0;
     dbus_message_iter_init(reply, &iter);
@@ -384,7 +384,7 @@ static JSBool DBus_callMethod(JSContext *ctx, JSObject *obj, uintN argc, jsval *
 
     JSBool success = DBusMarshalling::getVariantArray(ctx, &iter, &length, vector);
 
-    dbg2(cerr << "reply array length: " << length << endl);
+    dbg2_err("reply array length: " << length );
 
     if (success) {
         if (length == 0) {
@@ -423,10 +423,10 @@ static JSBool DBus_callMethodAA(JSContext *ctx, JSObject *obj, uintN argc, jsval
 
     dbus_error_init(&dbus_error);
 
-    dbg2(cerr << "sName " << JS_GetStringBytes(sName) << endl);
-    dbg2(cerr << "opath " << JS_GetStringBytes(oPath) << endl);
-    dbg2(cerr << "iface " << JS_GetStringBytes(iFace) << endl);
-    dbg2(cerr << "member " << JS_GetStringBytes(method) << endl);
+    dbg2_err( "sName " << JS_GetStringBytes(sName) );
+    dbg2_err( "opath " << JS_GetStringBytes(oPath) );
+    dbg2_err( "iface " << JS_GetStringBytes(iFace) );
+    dbg2_err( "member " << JS_GetStringBytes(method) );
 
     message = dbus_message_new_method_call(
             JS_GetStringBytes(sName),
@@ -829,14 +829,14 @@ filter_func(DBusConnection* connection, DBusMessage* message, void* user_data) {
         while (dbus_message_iter_next(&iter)) {
             length++;
         }
-        dbg3(cerr << "length = " << length << endl);
+        dbg3_err("length = " << length );
 
         jsval* vector = new jsval[length];
 
         dbus_message_iter_init(message, &iter);
 
         DBusMarshalling::getVariantArray(dta->ctx, &iter, &length, vector);
-        dbg3(cerr << "length after unmarsh = " << length << endl);
+        dbg3_err( "length after unmarsh = " << length );
 
         //nsIVariant *result;
         //  info->callback->Method(interface, name, args, length, &result);
