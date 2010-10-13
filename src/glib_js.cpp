@@ -149,8 +149,6 @@ static gboolean glib_idle_func(gpointer p) {
 
     } while (prop != JSVAL_VOID);
 
-	data->iter = iter;
-	JS_AddRoot(data->cx, &data->iter);
     JS_EndRequest(data->cx);
     // end transact
     return true;
