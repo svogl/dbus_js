@@ -27,7 +27,6 @@ typedef struct _Glib {
     // my data;
     JSContext *cx;
     JSObject* glib;
-    JSObject* iter;
 
     gpointer glibPtr;
 } GlibData;
@@ -108,6 +107,7 @@ static gboolean glib_idle_func(gpointer p) {
     if (!data) {
         data = (GlibData*) glibData;
     }
+
     JS_BeginRequest(data->cx);
     // begin transact
     jsval val;
@@ -128,14 +128,19 @@ static gboolean glib_idle_func(gpointer p) {
     JSObject* idleFuncs = JSVAL_TO_OBJECT(val);
     JSObject* iter = JS_NewPropertyIterator(data->cx, idleFuncs);
 
+    JS_AddRoot(data->cx, &iter);
+
     jsval prop = JSVAL_NULL;
     do {
         jsid id;
         jsval val;
+
         ret = JS_NextProperty(data->cx, iter, &id);
+
         if (!ret || JSVAL_IS_VOID(val))
             break;
         ret = JS_LookupPropertyById(data->cx, idleFuncs, id, &val);
+
         if (!ret)
             continue;
         if (!JSVAL_IS_OBJECT(val) )
@@ -149,6 +154,7 @@ static gboolean glib_idle_func(gpointer p) {
 
     } while (prop != JSVAL_VOID);
 
+    JS_RemoveRoot(data->cx, &iter);
     JS_EndRequest(data->cx);
     // end transact
     return true;
@@ -285,5 +291,6 @@ JSBool GlibExit(JSContext *ctx)
 
     return JS_TRUE;
 }
+
 
 /*************************************************************************************************/
