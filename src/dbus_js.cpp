@@ -611,8 +611,6 @@ static DBusHandlerResult handleMethodCall(DBusConnection* connection, DBusMessag
     const char* method = dbus_message_get_member(message);
     const char* path = dbus_message_get_path(message);
 
-
-
     string key = dbus_message_get_path(message);
     key += "_";
     key += dbus_message_get_interface(message);
@@ -624,15 +622,6 @@ static DBusHandlerResult handleMethodCall(DBusConnection* connection, DBusMessag
     ensure_val_is_object_or_fail(connection, message, ret, val, "service keys hash");
     JSObject* keys = JSVAL_TO_OBJECT(val);
 
-
-#if 0
-    // keys entry: oPath + service._iface
-
-    // -> get the service object
-    ret = JS_GetProperty(dta->ctx, keys, key.c_str(), &val);
-    ensure_val_is_object_or_fail(connection, message, ret, val, "service object");
-    JSObject* srv = JSVAL_TO_OBJECT(val);
-#else
     map<string, expInfo*>::iterator info = dta->expObjects.find(key);
     JSObject* srv = NULL;
     if (info != dta->expObjects.end()) {
@@ -650,7 +639,6 @@ static DBusHandlerResult handleMethodCall(DBusConnection* connection, DBusMessag
     val = OBJECT_TO_JSVAL(srv); // hack on
     ensure_val_is_object_or_fail(connection, message, ret, val, "service object");
 
-#endif
     // check for function name:
     JS_GetProperty(dta->ctx, srv, method, &val);
     ensure_val_is_object_or_fail(connection, message, ret, val, "service method");
@@ -688,26 +676,28 @@ static DBusHandlerResult handleMethodCall(DBusConnection* connection, DBusMessag
 
     // create a reply from the message
     DBusMessage* reply = dbus_message_new_method_return(message);
+    // append result.
+    DBusMessageIter iter;
+    dbus_message_iter_init_append(reply, &iter);
 
     // now check the return value
     if (JSVAL_IS_NULL(rval) || JSVAL_IS_VOID(rval)) {
         // no return value - nothing to do
         dbg2_err("no return value");
+	} else if ( JSVAL_IS_STRING(rval) ) {
+		DBusMarshalling::marshallBasicValue(dta->ctx, cbObj, &iter, &rval);
     } else {
-        // append result.
-        DBusMessageIter iter;
-        dbus_message_iter_init_append(reply, &iter);
-
         ret = DBusMarshalling::marshallVariant(dta->ctx, cbObj, &iter, &rval);
     }
-
+	
     // send the reply && flush the connection
     if (!dbus_connection_send(connection, reply, &serial)) {
         fprintf(stderr, "Out Of Memory!\n");
         exit(1); /// TODO: define strategy..!
     } else {
-        cerr << "serial " << serial << endl;
+		dbg3_err( "serial " << serial)  ;
     }
+
     dbus_connection_flush(connection);
 
     // free the reply
@@ -1110,7 +1100,7 @@ static JSBool DBusObjConstructor(JSContext *ctx, JSObject *obj, uintN argc, jsva
 }
 
 static void DBusObjDestructor(JSContext *ctx, JSObject *obj) {
-    printf("Destroying DBusObject\n");
+    //printf("Destroying DBusObject\n");
 }
 
 /*************************************************************************************************/

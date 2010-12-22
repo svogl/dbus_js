@@ -51,7 +51,7 @@ static JSBool GlibConstructor(JSContext *cx, JSObject *obj, uintN argc, jsval *a
 }
 
 static void GlibDestructor(JSContext *cx, JSObject *obj) {
-    printf("Destroying Glib object\n");
+
     GlibData* dta = (GlibData *) JS_GetPrivate(cx, obj);
     if (dta) {
         delete dta;
