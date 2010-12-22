@@ -40,9 +40,9 @@ JSBool DBusMarshalling::marshallBasicValue(JSContext *cx, JSObject *obj, DBusMes
                 &iv);
     } else if (JSVAL_IS_STRING(*val)) {
         JSString* sv = JSVAL_TO_STRING(*val);
-        //jschar* jv = JS_GetStringChars(sv);
-        //fprintf(stderr, ".. a string  %02x %02x %02x %02x!\n",jv[0],jv[1],jv[2],jv[3]);
+
         char* cv = JS_GetStringBytes(sv);
+
         ret = dbus_message_iter_append_basic(iter,
                 DBUS_TYPE_STRING,
                 &cv);
@@ -222,13 +222,11 @@ DBusMarshalling::marshallJSArray(JSContext* cx,
         DBusMessageIter* iter) {
     DBusMessageIter container_iter;
     int rv;
-    jsuint i;
+    int i;
     bool isDict = false;
 
     JSIdArray* values = JS_Enumerate(cx, arrayObj);
     dbg3_err("marshalling array l=" << values->length);
-
-    JSBool hasVariantValues = JSObjectHasVariantValues(cx, arrayObj);
 
     if (values->length == 0) {
         enforce_notnull(
@@ -243,8 +241,6 @@ DBusMarshalling::marshallJSArray(JSContext* cx,
     /****** optional: create a{sv} signature if array contains dict entries.*/
     jsval propkey;
     JS_GetPropertyById(cx, arrayObj, values->vector[0], &propkey);
-    JSObject* obj = JSVAL_TO_OBJECT(propkey);
-    JSClass* cls = JS_GetClass(cx, obj);
 
     if (jsvalIsDictObject(cx, propkey)) {
         dbg2_err("ITS A DICT OBJECT!");
@@ -280,7 +276,7 @@ DBusMarshalling::marshallJSArray(JSContext* cx,
         rv = marshallVariant(cx, arrayObj, &container_iter, &propval);
     }
     dbus_message_iter_close_container(iter, &container_iter);
-    printf("marshalled array object\n");
+    dbg2_err("marshalled array object\n");
     JS_free(cx, values);
     return JS_TRUE;
 }
@@ -288,8 +284,7 @@ DBusMarshalling::marshallJSArray(JSContext* cx,
 
 
 JSBool DBusMarshalling::getDictValTypeSig(JSContext* cx, JSObject* dictObj, char* sig) {
-    dbus_int32_t ret;
-    jsval val;
+	jsval val;
     jsval cast;
     JS_GetProperty(cx, dictObj,"value",&val);
 
@@ -300,10 +295,8 @@ JSBool DBusMarshalling::getDictValTypeSig(JSContext* cx, JSObject* dictObj, char
 
     int tag = JSVAL_TAG(val);
     if (JSVAL_IS_INT(val)) {
-        jsint iv = JSVAL_TO_INT(val);
         sig[0] = DBUS_TYPE_INT32 ;
     } else if (JSVAL_IS_STRING(val)) {
-        JSString* sv = JSVAL_TO_STRING(val);
         sig[0] =  DBUS_TYPE_STRING;
     } else if (JSVAL_IS_BOOLEAN(val)) {
         sig[0] = DBUS_TYPE_BOOLEAN;
@@ -350,7 +343,6 @@ DBusMarshalling::marshallDictObject(JSContext* ctx,
         JSObject* dictObj,
         DBusMessageIter* iter) {
     DBusMessageIter dict_iter, variant;
-    int rv;
     JSBool ret;
     dbg2_err("marsh DICT OBJECT");
 
@@ -363,10 +355,8 @@ DBusMarshalling::marshallDictObject(JSContext* ctx,
     cerr << "iter sig " << dbus_message_iter_get_signature(iter) << endl;
     enforce_notnull(
             dbus_message_iter_open_container(iter, DBUS_TYPE_DICT_ENTRY,
-            //DBUS_DICT_ENTRY_BEGIN_CHAR_AS_STRING
             DBUS_TYPE_STRING_AS_STRING
             DBUS_TYPE_VARIANT_AS_STRING
-            //DBUS_DICT_ENTRY_END_CHAR_AS_STRING
             , &dict_iter));
     cerr << "  dict_iter sig " << dbus_message_iter_get_signature(&dict_iter) << endl;
 
@@ -385,105 +375,9 @@ DBusMarshalling::marshallDictObject(JSContext* ctx,
     marshallBasicValue(ctx, dictObj, &variant, &propval);
 
     cerr << "  container_iter sig " << dbus_message_iter_get_signature(&dict_iter) << endl;
-    printf("marshalled dict object\n");
+    dbg2_err("marshalled dict object\n");
     return JS_TRUE;
 }
-
-
-
-
-#if 0
-JSBool
-DBusMarshalling::marshallDictObject(JSContext* cx,
-        JSObject* dictObj,
-        DBusMessageIter* iter) {
-    DBusMessageIter container_iter;
-    int rv;
-    dbg2_err("marsh DICT");
-
-    cerr << "iter sig " << dbus_message_iter_get_signature(iter) << endl;
-    enforce_notnull(
-            dbus_message_iter_open_container(iter, DBUS_TYPE_ARRAY,
-            DBUS_TYPE_ARRAY_AS_STRING
-            DBUS_DICT_ENTRY_BEGIN_CHAR_AS_STRING
-            DBUS_TYPE_STRING_AS_STRING
-            //		DBUS_TYPE_STRING_AS_STRING
-            DBUS_TYPE_VARIANT_AS_STRING
-            DBUS_DICT_ENTRY_END_CHAR_AS_STRING
-            , &container_iter));
-    cerr << "  container_iter sig " << dbus_message_iter_get_signature(&container_iter) << endl;
-
-    JSIdArray* values = JS_Enumerate(cx, dictObj);
-    dbg3_err("marshalling dict l=" << values->length);
-
-    for (int i = 0; i < values->length; i++) {
-        jsval propkey = 0;
-        jsval propval = 0;
-        //#define INCONT
-#ifdef INCONT
-        DBusMessageIter &dict_iter = container_iter;
-#else
-        DBusMessageIter dict_iter;
-        cerr << "---- -1 " << endl;
-        if (false) dbus_message_iter_open_container(&container_iter, DBUS_DICT_ENTRY_BEGIN_CHAR,
-                DBUS_DICT_ENTRY_BEGIN_CHAR_AS_STRING
-                DBUS_TYPE_STRING_AS_STRING
-                //			DBUS_TYPE_STRING_AS_STRING
-                DBUS_TYPE_VARIANT_AS_STRING
-                DBUS_DICT_ENTRY_END_CHAR_AS_STRING,
-                &dict_iter);
-
-        dbus_message_iter_open_container(iter, DBUS_DICT_ENTRY_BEGIN_CHAR,
-                DBUS_DICT_ENTRY_BEGIN_CHAR_AS_STRING
-                DBUS_TYPE_STRING_AS_STRING
-                //			DBUS_TYPE_STRING_AS_STRING
-                DBUS_TYPE_VARIANT_AS_STRING
-                DBUS_DICT_ENTRY_END_CHAR_AS_STRING,
-                &dict_iter);
-#endif
-        cerr << "      dict_iter sig " << dbus_message_iter_get_signature(&dict_iter) << endl;
-        if (!JS_IdToValue(cx, values->vector[i], &propkey))
-            return JS_FALSE;
-        if (JSVAL_IS_INT(propkey)) {
-            //dbg3_cerr(" int propkey is  "  << JSVAL_TO_INT(propkey) );
-        }
-        if (JSVAL_IS_STRING(propkey)) {
-            char* name = NULL;
-            JSString* snam = JS_ValueToString(cx, propkey);
-            name = JS_GetStringBytes(snam);
-            cerr << "[[[" << name << "]]]" << endl;
-
-#if !defined(INCONT)
-            cerr << "-----0 " << endl;
-
-            dbus_message_iter_append_basic(&dict_iter,
-                    DBUS_TYPE_STRING, &name);
-#endif
-        }
-        cerr << "-----1 " << endl;
-#ifdef INCONT
-        rv = marshallBasicValue(cx, dictObj, &dict_iter, &propkey);
-#endif       
-        JS_GetPropertyById(cx, dictObj, values->vector[i], &propval);
-
-        cerr << "-----2 " << endl;
-        rv = marshallBasicValue(cx, dictObj, &dict_iter, &propval);
-
-#ifdef INCONT
-        dbus_message_iter_close_container(iter, &dict_iter);
-#endif
-    }
-    JS_free(cx, values);
-
-    cerr << "  container_iter sig " << dbus_message_iter_get_signature(&container_iter) << endl;
-    //dbus_message_iter_close_container(iter, &container_iter);
-    printf("marshalled dict object\n");
-    return JS_TRUE;
-}
-
-
-
-#endif
 
 
 JSBool
@@ -541,7 +435,7 @@ DBusMarshalling::marshallJSObject(JSContext* cx,
     }
 
     dbus_message_iter_close_container(iter, &container_iter);
-    printf("marshalled object\n");
+    dbg2_err("marshalled object\n");
 
     JSVAL_UNLOCK(cx,oval);
     return JS_TRUE;
@@ -603,10 +497,9 @@ DBusMarshalling::marshallJSProperty(JSContext* cx,
         const JSBool& isVariant) {
     DBusMessageIter dictentry_iter;
     DBusMessageIter variant_iter;
-    JSBool hasCast = JS_FALSE;
     dbus_int32_t dbus_type = DBUS_TYPE_INVALID;
 
-    printf("marshalljsproperty\n");
+    dbg3_err("marshalljsproperty\n");
 
     JSString* propname = JS_ValueToString(cx, propval);
 
@@ -667,7 +560,7 @@ printf("* PROPERTY: %s\n", propstringbuf);
              */
             int intVal;
             JS_ValueToInt32(cx, propval, &intVal);
-            printf("  VALUE: %d\n", intVal);
+            dbg3_err("  VALUE: " << intVal);
             if (dbus_type == DBUS_TYPE_INVALID || isVariant) {
                 enforce_notnull(
                         dbus_message_iter_open_container(
@@ -697,7 +590,7 @@ printf("* PROPERTY: %s\n", propstringbuf);
             /* TODO: UTF16
              */
             const char* propvalstringbuf = JS_GetStringBytes(propvaljsstring);
-            printf("  VALUE: %s\n", propvalstringbuf);
+            dbg3_err("  VALUE: " << propvalstringbuf);
             if (dbus_type == DBUS_TYPE_INVALID || isVariant) {
                 enforce_notnull(
                         dbus_message_iter_open_container(
@@ -729,7 +622,7 @@ printf("* PROPERTY: %s\n", propstringbuf);
         {
             JSBool propbool;
             JS_ValueToBoolean(cx, propval, &propbool);
-            printf("  VALUE: %s\n", propbool ? "true" : "false");
+            dbg3_err("  VALUE: " << (propbool ? "true" : "false") );
             if (isVariant) {
                 enforce_notnull(
                         dbus_message_iter_open_container(
@@ -821,7 +714,6 @@ JSBool DBusMarshalling::unMarshallIter(JSContext *ctx, int current_type, DBusMes
                 dbg_err("variant ");
 
                 dbus_message_iter_recurse (iter, &subiter);
-                char* sig = dbus_message_iter_get_signature (&subiter);
                 int var_type = dbus_message_iter_get_arg_type(&subiter);
                 indent++;
                 ret = unMarshallIter(ctx,var_type,&subiter, val);
@@ -945,7 +837,6 @@ DBusMarshalling::unMarshallArray(JSContext *ctx, int type, DBusMessageIter *iter
     DBusMessageIter subiter;
     int length = 0;
     jsval* vector;
-    int current_type;
 
     dbus_message_iter_recurse(iter, &subiter);
     length = dbus_iter_length(&subiter);
@@ -979,7 +870,6 @@ JSBool
 DBusMarshalling::unMarshallDict(JSContext *ctx, int type, DBusMessageIter *iter, jsval* val) {
     JSBool ret = JS_TRUE;
     DBusMessageIter subiter;
-    int length = 0;
     int current_type;
     dbg3_err("dict entry");
 

@@ -1100,7 +1100,6 @@ static JSBool DBusObjConstructor(JSContext *ctx, JSObject *obj, uintN argc, jsva
 }
 
 static void DBusObjDestructor(JSContext *ctx, JSObject *obj) {
-    //printf("Destroying DBusObject\n");
 }
 
 /*************************************************************************************************/
@@ -1205,8 +1204,6 @@ static JSBool _DBus_connect(dbusData* dta, DBusBusType type) {
 }
 
 static JSBool DBus_s_systemBus(JSContext *ctx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
-    printf("object is in systemBus: %p\n", obj);
-
     check_args((argc == 0), "must not pass an argument!\n");
 
     JSObject *bus = JS_ConstructObject(ctx, &DBus_jsClass, NULL, NULL);
@@ -1225,8 +1222,6 @@ static JSBool DBus_s_systemBus(JSContext *ctx, JSObject *obj, uintN argc, jsval 
 }
 
 static JSBool DBus_s_sessionBus(JSContext *ctx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
-    printf("object is in sessionBus: %p\n", obj);
-
     check_args((argc == 0), "must not pass an argument!\n");
 
     JSObject *bus = JS_ConstructObject(ctx, &DBus_jsClass, NULL, NULL);
